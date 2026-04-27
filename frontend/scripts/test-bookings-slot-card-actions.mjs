@@ -3,6 +3,8 @@ import path from 'node:path'
 
 const filePath = path.resolve(process.cwd(), 'src', 'app', 'bookings', 'BookingsList.js')
 const content = fs.readFileSync(filePath, 'utf8')
+const cssPath = path.resolve(process.cwd(), 'src', 'app', 'globals.css')
+const css = fs.readFileSync(cssPath, 'utf8')
 const failures = []
 
 const requiredSnippets = [
@@ -17,6 +19,21 @@ const requiredSnippets = [
 for (const snippet of requiredSnippets) {
   if (!content.includes(snippet)) {
     failures.push(`BookingsList.js is missing slot action hook "${snippet}"`)
+  }
+}
+
+const requiredCssSnippets = [
+  '.booking-slot-card',
+  '.booking-slot-card-header',
+  '.booking-slot-card-actions',
+  '.booking-slot-action-primary',
+  '.booking-slot-action-secondary',
+  '.booking-slot-action-danger',
+]
+
+for (const snippet of requiredCssSnippets) {
+  if (!css.includes(snippet)) {
+    failures.push(`globals.css is missing slot action class "${snippet}"`)
   }
 }
 

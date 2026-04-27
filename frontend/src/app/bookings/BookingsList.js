@@ -87,14 +87,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'confirmed',
       label: 'Accept Booking',
       icon: CheckCircle2,
-      className: 'btn-primary !px-3 !py-1.5 !text-xs',
+      className: 'btn-primary min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
       reason: 'Accepted by staff from admin appointments.',
     },
     {
       status: 'declined',
       label: 'Decline',
       icon: XCircle,
-      className: 'btn-ghost !px-3 !py-1.5 !text-xs',
+      className: 'btn-ghost min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
       reason: 'Declined by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to decline this booking?',
@@ -104,7 +104,7 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger !px-3 !py-1.5 !text-xs',
+      className: 'btn-danger min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -116,14 +116,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'completed',
       label: 'Mark Complete',
       icon: CheckCircle2,
-      className: 'btn-primary !px-3 !py-1.5 !text-xs',
+      className: 'btn-primary min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
       reason: 'Completed by staff from admin appointments.',
     },
     {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger !px-3 !py-1.5 !text-xs',
+      className: 'btn-danger min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -135,14 +135,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'confirmed',
       label: 'Accept New Slot',
       icon: CheckCircle2,
-      className: 'btn-primary !px-3 !py-1.5 !text-xs',
+      className: 'btn-primary min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
       reason: 'Accepted rescheduled slot from admin appointments.',
     },
     {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger !px-3 !py-1.5 !text-xs',
+      className: 'btn-danger min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -572,7 +572,7 @@ function SlotDefinitionsPanel({
           const isBusy = mutationState.status === 'submitting' && mutationState.target === slot.timeSlotId
 
           return (
-            <div key={slot.timeSlotId} className="rounded-xl border border-surface-border bg-surface-raised p-3">
+            <div key={slot.timeSlotId} className="booking-slot-card">
               {isEditing ? (
                 <div className="space-y-3">
                   <label className="text-xs text-ink-muted">
@@ -627,10 +627,10 @@ function SlotDefinitionsPanel({
                 </div>
               ) : (
                 <>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-bold text-ink-primary">{slot.label}</p>
-                      <p className="text-xs text-ink-muted mt-1">
+                  <div className="booking-slot-card-header">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-bold text-ink-primary">{slot.label}</p>
+                      <p className="mt-1 text-sm text-ink-secondary">
                         {formatTimeSlotWindow(slot) || 'Time window unavailable'}
                       </p>
                     </div>
@@ -638,15 +638,15 @@ function SlotDefinitionsPanel({
                       {slot.isActive === false ? 'Inactive' : 'Active'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-ink-muted mt-3">
+                  <p className="mt-3 text-xs text-ink-muted">
                     Capacity {slot.capacity ?? 'unset'} booking{slot.capacity === 1 ? '' : 's'} per date.
                   </p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="booking-slot-card-actions">
                     <button
                       type="button"
                       disabled={mutationState.status === 'submitting'}
                       onClick={() => onStartEdit(slot)}
-                      className="btn-ghost !px-3 !py-2 !text-xs"
+                      className="booking-slot-action-secondary"
                     >
                       <Edit3 size={13} />
                       Edit
@@ -655,7 +655,7 @@ function SlotDefinitionsPanel({
                       type="button"
                       disabled={mutationState.status === 'submitting'}
                       onClick={() => onToggleActive(slot)}
-                      className={`${slot.isActive === false ? 'btn-primary' : 'btn-ghost'} !px-3 !py-2 !text-xs`}
+                      className={slot.isActive === false ? 'booking-slot-action-primary' : 'booking-slot-action-secondary'}
                     >
                       {isBusy ? <RefreshCw size={13} className="animate-spin" /> : null}
                       {slot.isActive === false ? 'Activate' : 'Pause'}
@@ -664,7 +664,7 @@ function SlotDefinitionsPanel({
                       type="button"
                       disabled={mutationState.status === 'submitting'}
                       onClick={() => onDelete(slot)}
-                      className="btn-danger col-span-2 !px-3 !py-2 !text-xs"
+                      className="booking-slot-action-danger"
                     >
                       {isBusy ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
                       Delete Slot
@@ -779,10 +779,10 @@ function ScheduleSlotCard({ slot, onStatusAction, onOpenJobOrder, busyBookingId 
                 ) : null}
 
                 {booking.jobOrderId ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
                     <button
                       type="button"
-                      className="btn-ghost !px-3 !py-1.5 !text-xs"
+                      className="btn-ghost min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]"
                       onClick={() => onOpenJobOrder(booking)}
                     >
                       <ListChecks size={13} />
@@ -792,7 +792,7 @@ function ScheduleSlotCard({ slot, onStatusAction, onOpenJobOrder, busyBookingId 
                 ) : null}
 
                 {actions.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
                     {actions.map((action) => {
                       const Icon = action.icon
                       const isBusy = busyBookingId === booking.id
