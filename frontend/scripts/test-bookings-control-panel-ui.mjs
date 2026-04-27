@@ -3,6 +3,8 @@ import path from 'node:path'
 
 const filePath = path.resolve(process.cwd(), 'src', 'app', 'bookings', 'BookingsList.js')
 const content = fs.readFileSync(filePath, 'utf8')
+const cssPath = path.resolve(process.cwd(), 'src', 'app', 'globals.css')
+const css = fs.readFileSync(cssPath, 'utf8')
 const failures = []
 
 const requiredSnippets = [
@@ -17,6 +19,21 @@ const requiredSnippets = [
 for (const snippet of requiredSnippets) {
   if (!content.includes(snippet)) {
     failures.push(`BookingsList.js is missing redesign hook "${snippet}"`)
+  }
+}
+
+const requiredCssSnippets = [
+  '.booking-page-shell',
+  '.booking-page-header',
+  '.booking-control-strip',
+  '.booking-segmented-control',
+  '.booking-tab-button',
+  '.booking-tab-button-active',
+]
+
+for (const snippet of requiredCssSnippets) {
+  if (!css.includes(snippet)) {
+    failures.push(`globals.css is missing booking redesign class "${snippet}"`)
   }
 }
 
