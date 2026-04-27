@@ -87,14 +87,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'confirmed',
       label: 'Accept Booking',
       icon: CheckCircle2,
-      className: 'btn-primary min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
+      className: 'btn-primary min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
       reason: 'Accepted by staff from admin appointments.',
     },
     {
       status: 'declined',
       label: 'Decline',
       icon: XCircle,
-      className: 'btn-ghost min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
+      className: 'btn-ghost min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
       reason: 'Declined by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to decline this booking?',
@@ -104,7 +104,7 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
+      className: 'btn-danger min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -116,14 +116,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'completed',
       label: 'Mark Complete',
       icon: CheckCircle2,
-      className: 'btn-primary min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
+      className: 'btn-primary min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
       reason: 'Completed by staff from admin appointments.',
     },
     {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
+      className: 'btn-danger min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -135,14 +135,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'confirmed',
       label: 'Accept New Slot',
       icon: CheckCircle2,
-      className: 'btn-primary min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
+      className: 'btn-primary min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
       reason: 'Accepted rescheduled slot from admin appointments.',
     },
     {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]',
+      className: 'btn-danger min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -407,8 +407,8 @@ function StatusBadge({ status }) {
 
 function EmptyState({ icon: Icon, title, copy }) {
   return (
-    <div className="px-5 py-8 text-center">
-      <Icon size={22} className="mx-auto text-ink-dim mb-2" />
+    <div className="flex min-h-[180px] flex-col items-center justify-center px-5 py-8 text-center">
+      <Icon size={22} className="mx-auto mb-3 text-ink-dim" />
       <p className="text-sm font-bold text-ink-primary">{title}</p>
       <p className="text-xs text-ink-muted mt-1 max-w-md mx-auto">{copy}</p>
     </div>
@@ -751,17 +751,17 @@ function ScheduleSlotCard({ slot, onStatusAction, onOpenJobOrder, busyBookingId 
             const handoffStateMeta = getBookingHandoffStateMeta(booking)
             return (
               <div key={booking.id} className="px-5 py-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <p className="font-mono text-[11px] font-bold tracking-wide" style={{ color: '#f07c00' }}>
                     {formatBookingReference(booking.id)}
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
                     {handoffStateMeta ? <span className={`badge ${handoffStateMeta.cls}`}>{handoffStateMeta.label}</span> : null}
                     <StatusBadge status={booking.status} />
                   </div>
                 </div>
                 <p className="text-sm font-semibold text-ink-primary mt-1.5 truncate">{getServiceNames(booking)}</p>
-                <div className="mt-1 grid sm:grid-cols-2 gap-x-4 gap-y-0.5">
+                <div className="mt-2 grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
                   <p className="text-xs text-ink-muted truncate">
                     {getCustomerLabel(booking)}
                     {booking.customerEmail && booking.customerEmail !== getCustomerLabel(booking) ? ` · ${booking.customerEmail}` : ''}
@@ -779,10 +779,10 @@ function ScheduleSlotCard({ slot, onStatusAction, onOpenJobOrder, busyBookingId 
                 ) : null}
 
                 {booking.jobOrderId ? (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className="btn-ghost min-h-11 w-full justify-center text-sm xl:w-auto xl:min-w-[160px]"
+                      className="btn-ghost min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]"
                       onClick={() => onOpenJobOrder(booking)}
                     >
                       <ListChecks size={13} />
@@ -792,7 +792,7 @@ function ScheduleSlotCard({ slot, onStatusAction, onOpenJobOrder, busyBookingId 
                 ) : null}
 
                 {actions.length > 0 ? (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {actions.map((action) => {
                       const Icon = action.icon
                       const isBusy = busyBookingId === booking.id
@@ -1759,12 +1759,12 @@ export default function BookingsList() {
       </div>
 
       {tab === 'schedule' ? (
-        <div className="space-y-4">
+        <section className="space-y-5">
           {!hasScheduleData && ['unauthorized', 'forbidden', 'validation-error', 'error'].includes(scheduleState.status) ? (
             <BlockingState state={scheduleState} onRetry={refreshBookingOperations} />
           ) : (
             <>
-              <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <SummaryTile
                   icon={CalendarDays}
                   label="Scheduled Date"
@@ -1843,7 +1843,7 @@ export default function BookingsList() {
               )}
             </>
           )}
-        </div>
+        </section>
       ) : null}
 
       {tab === 'calendar' ? (
@@ -1865,12 +1865,12 @@ export default function BookingsList() {
       ) : null}
 
       {tab === 'queue' ? (
-        <div className="space-y-4">
+        <section className="space-y-5">
           {!hasQueueData && ['unauthorized', 'forbidden', 'validation-error', 'error'].includes(queueState.status) ? (
             <BlockingState state={queueState} onRetry={refreshBookingOperations} />
           ) : (
             <>
-              <div className="grid sm:grid-cols-3 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <SummaryTile
                   icon={ListChecks}
                   label="Current Queue"
@@ -1900,7 +1900,7 @@ export default function BookingsList() {
               {isLoadingQueue ? <LoadingRows /> : <QueueTable queue={queueState.data} />}
             </>
           )}
-        </div>
+        </section>
       ) : null}
 
       <BookingActionConfirmModal

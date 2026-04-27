@@ -41,6 +41,26 @@ if (!content.includes("{ key: 'calendar', icon: CalendarDays, label: 'Calendar V
   failures.push('BookingsList.js must continue to expose the calendar tab')
 }
 
+if (!content.includes('<BookingsCalendarView')) {
+  failures.push('BookingsList.js must continue rendering BookingsCalendarView')
+}
+
+if (!content.includes('label="Current Queue"')) {
+  failures.push('BookingsList.js must continue rendering the queue summary tile')
+}
+
+if (!content.includes('className="space-y-5"')) {
+  failures.push('BookingsList.js must use the refined section spacing for schedule and queue surfaces')
+}
+
+if (!content.includes('className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"')) {
+  failures.push('BookingsList.js must keep the refined schedule summary grid grouping')
+}
+
+if (!content.includes('className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"')) {
+  failures.push('BookingsList.js must keep the refined queue summary grid grouping')
+}
+
 if (failures.length > 0) {
   console.error('Bookings control-panel UI contract missing:')
   for (const failure of failures) console.error(`- ${failure}`)
