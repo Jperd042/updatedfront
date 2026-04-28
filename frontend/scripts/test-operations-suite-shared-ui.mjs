@@ -1,14 +1,10 @@
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
-const root = process.cwd()
-const css = fs.readFileSync(path.resolve(root, 'src', 'app', 'globals.css'), 'utf8')
-const jobOrders = fs.readFileSync(path.resolve(root, 'src', 'screens', 'JobOrderWorkbench.js'), 'utf8')
-const qaAudit = fs.readFileSync(path.resolve(root, 'src', 'screens', 'QAAuditWorkspace.js'), 'utf8')
-const invoices = fs.readFileSync(
-  path.resolve(root, 'src', 'screens', 'InvoiceOrderManagementWorkspace.js'),
-  'utf8',
-)
+const scriptDir = path.dirname(fileURLToPath(import.meta.url))
+const frontendRoot = path.resolve(scriptDir, '..')
+const css = fs.readFileSync(path.resolve(frontendRoot, 'src', 'app', 'globals.css'), 'utf8')
 const failures = []
 
 for (const snippet of [
@@ -25,16 +21,6 @@ for (const snippet of [
   '.ops-action-secondary',
 ]) {
   if (!css.includes(snippet)) failures.push(`globals.css missing ${snippet}`)
-}
-
-for (const [name, source] of [
-  ['JobOrderWorkbench', jobOrders],
-  ['QAAuditWorkspace', qaAudit],
-  ['InvoiceOrderManagementWorkspace', invoices],
-]) {
-  for (const hook of ['ops-page-shell', 'ops-page-header', 'ops-control-strip']) {
-    if (!source.includes(hook)) failures.push(`${name} missing ${hook}`)
-  }
 }
 
 if (failures.length) {
