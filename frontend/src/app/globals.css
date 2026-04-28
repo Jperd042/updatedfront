@@ -232,6 +232,24 @@
   .booking-page-title { @apply text-2xl md:text-[30px] font-black tracking-tight text-ink-primary; }
   .booking-page-copy { @apply max-w-3xl text-sm leading-6 text-ink-secondary; }
 
+  .ops-page-shell { @apply space-y-6; }
+  .ops-page-header { @apply flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between; }
+  .ops-page-kicker { @apply text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-muted; }
+  .ops-page-title { @apply text-2xl md:text-[30px] font-black tracking-tight text-ink-primary; }
+  .ops-page-copy { @apply max-w-3xl text-sm leading-6 text-ink-secondary; }
+
+  .ops-control-strip {
+    @apply card p-4 md:p-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end;
+  }
+
+  .ops-summary-grid { @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4; }
+  .ops-workspace-grid { @apply grid gap-5 2xl:grid-cols-[420px_minmax(0,1fr)]; }
+  .ops-panel { @apply card p-4 md:p-5; }
+  .ops-panel-muted { @apply rounded-xl border border-surface-border bg-surface-raised px-4 py-3; }
+  .ops-action-primary { @apply btn-primary min-h-11 justify-center; }
+  .ops-action-secondary { @apply btn-ghost min-h-11 justify-center; }
+  .ops-action-danger { @apply btn-danger min-h-11 justify-center; }
+
   .booking-control-strip {
     @apply card p-4 md:p-5 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end;
   }
