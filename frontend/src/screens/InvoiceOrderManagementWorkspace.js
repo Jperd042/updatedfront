@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   BarChart3,
-  CheckCircle2,
   Clock3,
   Database,
   ExternalLink,
@@ -86,6 +85,23 @@ const shortId = (value) => {
   return normalizedValue ? normalizedValue.slice(0, 8).toUpperCase() : 'NONE'
 }
 
+const getLoadMessageToneClass = (status) => {
+  if (status === 'invoice_order_loaded') {
+    return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+  }
+
+  if (
+    status === 'invoice_order_failed' ||
+    status === 'invoice_order_runtime_unavailable' ||
+    status === 'invoice_order_forbidden_role' ||
+    status === 'invoice_order_unauthorized'
+  ) {
+    return 'border-red-500/25 bg-red-500/10 text-red-200'
+  }
+
+  return 'border-amber-500/25 bg-amber-500/10 text-amber-100'
+}
+
 function InfoPanel({ icon: Icon = Database, title, body, tone = 'info' }) {
   const toneClass =
     tone === 'warning'
@@ -136,21 +152,6 @@ function StatusBadge({ value }) {
           : 'badge-gray'
 
   return <span className={`badge ${cls}`}>{formatLabel(normalizedValue, 'Unknown')}</span>
-}
-
-function SectionShell({ title, description, action, children }) {
-  return (
-    <section className="card overflow-hidden">
-      <div className="flex flex-col gap-3 border-b border-surface-border bg-surface-raised/70 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-lg font-bold text-ink-primary">{title}</p>
-          <p className="mt-1 text-sm leading-6 text-ink-muted">{description}</p>
-        </div>
-        {action}
-      </div>
-      <div className="p-5">{children}</div>
-    </section>
-  )
 }
 
 function DetailTile({ label, value, breakAll = false }) {
@@ -388,9 +389,28 @@ export default function InvoiceOrderManagementWorkspace() {
   const invoiceAging = agingState.snapshot
   const agingBuckets = invoiceAging?.agingBuckets ?? []
   const trackedInvoicePolicies = invoiceAging?.trackedInvoicePolicies ?? []
+  const ecommerceOrder = ecommerceState.order ?? null
+  const ecommerceInvoice = ecommerceState.invoice ?? null
+  const paymentEntries = ecommerceInvoice?.paymentEntries ?? []
   const ecommerceLoadLabel = LOAD_STATE_LABELS[ecommerceState.status] ?? 'Order Lookup'
   const jobOrderLoadLabel = LOAD_STATE_LABELS[jobOrderState.status] ?? 'Service Invoice Lookup'
   const agingLoadLabel = LOAD_STATE_LABELS[agingState.status] ?? 'Invoice Aging'
+  const lookupStateValue =
+    jobOrderState.status === 'invoice_order_loading' || ecommerceState.status === 'invoice_order_loading'
+      ? 'Syncing'
+      : jobOrderState.jobOrder || ecommerceOrder
+        ? 'Loaded'
+        : 'Awaiting'
+  const paymentStateValue = serviceInvoice?.paymentStatus
+    ? formatLabel(serviceInvoice.paymentStatus)
+    : ecommerceInvoice?.status
+      ? formatLabel(ecommerceInvoice.status)
+      : 'Awaiting Detail'
+  const fulfillmentStateValue = ecommerceOrder?.status
+    ? formatLabel(ecommerceOrder.status)
+    : jobOrderState.jobOrder?.status
+      ? formatLabel(jobOrderState.jobOrder.status)
+      : 'Awaiting Detail'
 
   if (!user?.accessToken) {
     return (
@@ -415,389 +435,457 @@ export default function InvoiceOrderManagementWorkspace() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="card relative overflow-hidden p-6 md:p-7">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-80 bg-gradient-to-l from-brand-orange/10 to-transparent" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-orange">
-              Staff Finance Surface
-            </p>
-            <h1 className="mt-3 text-3xl font-bold text-ink-primary">Invoice & Order Management</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-secondary">
-              A clear web entry point for service invoice-ready job orders, ecommerce order snapshots,
-              and invoice-aging analytics. This page labels owner domains carefully so staff do not confuse
-              manual payment records with online gateway settlement.
-            </p>
-          </div>
+    <div className="ops-page-shell">
+      <section className="ops-page-header">
+        <div className="space-y-2">
+          <p className="ops-page-kicker">Financial Operations</p>
+          <h1 className="ops-page-title">Invoice & Order Management</h1>
+          <p className="ops-page-copy">
+            Inspect service invoice readiness, known ecommerce order snapshots, and aging analytics from one
+            structured staff finance surface.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={loadInvoiceAging}
+          disabled={agingState.status === 'invoice_order_loading'}
+          className="ops-action-secondary min-w-[148px] self-start disabled:cursor-not-allowed disabled:opacity-60 xl:self-auto"
+        >
+          <RefreshCcw size={14} className={agingState.status === 'invoice_order_loading' ? 'animate-spin' : undefined} />
+          Refresh
+        </button>
+      </section>
 
-          <div className="flex flex-wrap gap-2">
-            <span className="badge badge-green">Live: service invoice lookup</span>
-            <span className="badge badge-green">Live: known ecommerce order lookup</span>
-          </div>
+      <section className="ops-control-strip">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]">
+          <label className="text-xs text-ink-muted">
+            Job order id
+            <input
+              value={jobOrderId}
+              onChange={(event) => setJobOrderId(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-surface-border bg-surface-raised px-4 py-3 text-sm text-ink-primary outline-none focus:border-[#f07c00]"
+              placeholder="Paste a finalized job-order UUID"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={handleLoadServiceInvoice}
+            disabled={jobOrderState.status === 'invoice_order_loading'}
+            className="ops-action-primary xl:min-w-[148px] xl:self-end"
+          >
+            {jobOrderState.status === 'invoice_order_loading' ? (
+              <LoaderCircle size={14} className="animate-spin" />
+            ) : (
+              <Search size={14} />
+            )}
+            Load Job Order
+          </button>
+          <label className="text-xs text-ink-muted">
+            Ecommerce order id
+            <input
+              value={ecommerceOrderId}
+              onChange={(event) => setEcommerceOrderId(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-surface-border bg-surface-raised px-4 py-3 text-sm text-ink-primary outline-none focus:border-[#f07c00]"
+              placeholder="Paste an ecommerce order UUID"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={handleLoadEcommerceOrder}
+            disabled={ecommerceState.status === 'invoice_order_loading'}
+            className="ops-action-primary xl:min-w-[148px] xl:self-end"
+          >
+            {ecommerceState.status === 'invoice_order_loading' ? (
+              <LoaderCircle size={14} className="animate-spin" />
+            ) : (
+              <Search size={14} />
+            )}
+            Load Order
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="badge badge-green">Live service invoice lookup</span>
+          <span className="badge badge-blue">Known-order ecommerce lookup</span>
+          <span className="badge badge-orange">Read-only aging analytics</span>
+          <span className="badge badge-gray">Payment ownership stays routed</span>
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <section className="ops-summary-grid">
         <MetricCard
-          icon={Wrench}
-          label="Service Invoice Source"
-          value="Job Orders"
-          sub="Finalization and service-payment recording stay inside the job-order owner workflow."
-        />
-        <MetricCard
-          icon={ShoppingBag}
-          label="Ecommerce Source"
-          value="Orders"
-          sub="Known-order reads stay read-only from this staff hub."
+          icon={Database}
+          label="Lookup State"
+          value={lookupStateValue}
+          sub={`Service: ${jobOrderLoadLabel} • Orders: ${ecommerceLoadLabel}`}
         />
         <MetricCard
           icon={BarChart3}
-          label="Invoice Aging"
-          value={invoiceAging?.totals?.trackedInvoices ?? 'Live'}
-          sub="Reminder-rule analytics remain read-only and can lag source writes."
+          label="Aging Snapshot"
+          value={invoiceAging?.totals?.trackedInvoices ?? 0}
+          sub={`${agingBuckets.length} buckets • ${trackedInvoicePolicies.length} reminder policies`}
         />
-      </div>
+        <MetricCard
+          icon={ReceiptText}
+          label="Payment State"
+          value={paymentStateValue}
+          sub={
+            serviceInvoice
+              ? serviceInvoice.invoiceReference
+              : ecommerceInvoice
+                ? `${paymentEntries.length} payment entr${paymentEntries.length === 1 ? 'y' : 'ies'} tracked`
+                : 'Payment entries stay in owner workflows.'
+          }
+        />
+        <MetricCard
+          icon={PackageCheck}
+          label="Fulfillment State"
+          value={fulfillmentStateValue}
+          sub={
+            ecommerceOrder
+              ? ecommerceOrder.orderNumber
+              : jobOrderState.jobOrder
+                ? `JO-${shortId(jobOrderState.jobOrder.id)}`
+                : 'Load a job order or order id to inspect live detail.'
+          }
+        />
+      </section>
 
-      <InfoPanel
-        icon={ReceiptText}
-        title="Payment-state boundary"
-        body={staffInvoiceOrderPaymentCopy}
-      />
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <SectionShell
-          title="Service Invoice Lookup"
-          description="Load a known job order and inspect whether finalization has produced an invoice-ready record."
-          action={<span className="badge badge-gray">{jobOrderLoadLabel}</span>}
-        >
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-            <label className="text-xs text-ink-muted">
-              Job order id
-              <input
-                value={jobOrderId}
-                onChange={(event) => setJobOrderId(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-sm text-ink-primary outline-none focus:border-[#f07c00]"
-                placeholder="Paste a finalized job-order UUID"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={handleLoadServiceInvoice}
-              disabled={jobOrderState.status === 'invoice_order_loading'}
-              className="btn-primary self-end"
-            >
-              {jobOrderState.status === 'invoice_order_loading' ? (
-                <LoaderCircle size={14} className="animate-spin" />
-              ) : (
-                <Search size={14} />
-              )}
-              Load Service Invoice
-            </button>
-          </div>
-
-          {jobOrderState.message ? (
-            <div
-              className={`mt-4 rounded-xl border px-4 py-3 text-xs ${
-                serviceInvoice
-                  ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
-                  : 'border-amber-500/25 bg-amber-500/10 text-amber-100'
-              }`}
-            >
-              {jobOrderState.message}
-            </div>
-          ) : null}
-
-          {jobOrderState.jobOrder ? (
-            <div className="mt-4 space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <DetailTile label="Job Order" value={shortId(jobOrderState.jobOrder.id)} />
-                <DetailTile label="Status" value={formatLabel(jobOrderState.jobOrder.status)} />
-                <DetailTile label="Source" value={formatLabel(jobOrderState.jobOrder.sourceType)} />
-              </div>
-
-              {serviceInvoice ? (
-                <div className="rounded-3xl border border-surface-border bg-surface-card p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-orange">
-                        Service Invoice-Ready Record
-                      </p>
-                      <p className="mt-2 text-xl font-bold text-ink-primary">{serviceInvoice.invoiceReference}</p>
-                    </div>
-                    <StatusBadge value={serviceInvoice.paymentStatus} />
-                  </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <DetailTile label="Amount Recorded" value={formatInvoiceOrderCurrency(serviceInvoice.amountPaidCents)} />
-                    <DetailTile label="Payment Method" value={formatLabel(serviceInvoice.paymentMethod, 'Not recorded')} />
-                    <DetailTile label="Paid At" value={formatDateTime(serviceInvoice.paidAt)} />
-                    <DetailTile label="Finalized By" value={serviceInvoice.finalizedByUserId} breakAll />
-                  </div>
-
-                  <p className="mt-4 text-sm leading-6 text-ink-muted">
-                    Service invoice payment can be recorded from the Job Order Workbench only after invoice-ready finalization.
-                  </p>
-                </div>
-              ) : (
-                <InfoPanel
-                  icon={Clock3}
-                  title="Not invoice-ready yet"
-                  body="This job order has not produced an invoice-ready record. Use the Job Order Workbench to complete work evidence, QA gates, and finalization."
-                  tone="warning"
-                />
-              )}
-
-              <Link href="/admin/job-orders" className="btn-secondary w-fit">
-                <ExternalLink size={14} />
-                Open Job Order Workbench
-              </Link>
-            </div>
-          ) : null}
-        </SectionShell>
-
-        <SectionShell
-          title="Ecommerce Order / Invoice Lookup"
-          description="Load a known ecommerce order id. This hub is read-only until broad staff queues are added."
-          action={<span className="badge badge-gray">{ecommerceLoadLabel}</span>}
-        >
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-            <label className="text-xs text-ink-muted">
-              Ecommerce order id
-              <input
-                value={ecommerceOrderId}
-                onChange={(event) => setEcommerceOrderId(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-surface-border bg-surface-raised px-3 py-2 text-sm text-ink-primary outline-none focus:border-[#f07c00]"
-                placeholder="Paste an ecommerce order UUID"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={handleLoadEcommerceOrder}
-              disabled={ecommerceState.status === 'invoice_order_loading'}
-              className="btn-primary self-end"
-            >
-              {ecommerceState.status === 'invoice_order_loading' ? (
-                <LoaderCircle size={14} className="animate-spin" />
-              ) : (
-                <Search size={14} />
-              )}
-              Load Order
-            </button>
-          </div>
-
-          {ecommerceState.message ? (
-            <div
-              className={`mt-4 rounded-xl border px-4 py-3 text-xs ${
-                ecommerceState.status === 'invoice_order_loaded'
-                  ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
-                  : ecommerceState.status === 'invoice_order_runtime_unavailable'
-                    ? 'border-red-500/25 bg-red-500/10 text-red-200'
-                    : 'border-amber-500/25 bg-amber-500/10 text-amber-100'
-              }`}
-            >
-              {ecommerceState.message}
-            </div>
-          ) : null}
-
-          {ecommerceState.order ? (
-            <div className="mt-4 space-y-4">
-              <div className="rounded-3xl border border-surface-border bg-surface-card p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-orange">
-                      Ecommerce Order Snapshot
-                    </p>
-                    <p className="mt-2 text-xl font-bold text-ink-primary">{ecommerceState.order.orderNumber}</p>
-                    <p className="mt-1 text-xs text-ink-muted break-all">{ecommerceState.order.id}</p>
-                  </div>
-                  <StatusBadge value={ecommerceState.order.status} />
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <DetailTile label="Subtotal" value={ecommerceState.order.subtotalLabel} />
-                  <DetailTile label="Items" value={ecommerceState.order.items.length} />
-                  <DetailTile label="Created" value={formatDateTime(ecommerceState.order.createdAt)} />
-                </div>
-              </div>
-
-              {ecommerceState.invoice ? (
-                <div className="rounded-3xl border border-surface-border bg-surface-card p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-orange">
-                        Ecommerce Invoice Tracking
-                      </p>
-                      <p className="mt-2 text-xl font-bold text-ink-primary">{ecommerceState.invoice.invoiceNumber}</p>
-                    </div>
-                    <StatusBadge value={ecommerceState.invoice.status} />
-                  </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <DetailTile label="Total" value={ecommerceState.invoice.totalLabel} />
-                    <DetailTile label="Amount Due" value={ecommerceState.invoice.amountDueLabel} />
-                    <DetailTile label="Aging" value={ecommerceState.invoice.agingBucketLabel} />
-                    <DetailTile label="Due At" value={formatDateTime(ecommerceState.invoice.dueAt)} />
-                  </div>
-
-                  <div className="mt-4">
-                    <PaymentEntries entries={ecommerceState.invoice.paymentEntries} />
-                  </div>
-                </div>
-              ) : ecommerceState.invoiceError ? (
-                <InfoPanel
-                  icon={AlertTriangle}
-                  title="Invoice detail unavailable"
-                  body={ecommerceState.invoiceError}
-                  tone="warning"
-                />
-              ) : null}
-            </div>
-          ) : (
-            <div className="mt-4 rounded-3xl border border-dashed border-surface-border bg-surface-raised px-5 py-10 text-center">
-              <ShoppingBag size={24} className="mx-auto text-ink-muted" />
-              <p className="mt-3 text-sm font-bold text-ink-primary">Known-order lookup only</p>
-              <p className="mt-2 text-xs leading-6 text-ink-muted">
-                Paste a known ecommerce order id to load live order and invoice detail. If there is no id yet, this panel stays empty instead of showing placeholder queue data.
+      <section className="space-y-5">
+        <div className="ops-panel">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="card-title">Financial Snapshot</p>
+              <p className="mt-1 text-sm leading-6 text-ink-muted">
+                Group aging analytics, payment-state guidance, and live lookup notices before drilling into a
+                specific billing record.
               </p>
             </div>
-          )}
-        </SectionShell>
-      </div>
-
-      <SectionShell
-        title="Invoice Aging Analytics"
-        description="Read-only reminder-policy analytics remain visible here and in the analytics hub, but they are not direct payment-settlement truth."
-        action={
-          <button
-            type="button"
-            onClick={() => loadInvoiceAging()}
-            disabled={agingState.status === 'invoice_order_loading'}
-            className="btn-secondary"
-          >
-            <RefreshCcw size={14} className={agingState.status === 'invoice_order_loading' ? 'animate-spin' : ''} />
-            Refresh Aging
-          </button>
-        }
-      >
-        <div className="mb-4 flex flex-wrap gap-2">
-          <span className="badge badge-gray">{agingLoadLabel}</span>
-          <Link href="/admin/summaries" className="badge badge-blue">
-            Open analytics hub
-          </Link>
-        </div>
-
-        {agingState.message && agingState.status === 'invoice_order_failed' ? (
-          <InfoPanel icon={AlertTriangle} title="Invoice-aging load failed" body={agingState.message} tone="warning" />
-        ) : null}
-
-        <div className="grid gap-4 md:grid-cols-4">
-          <MetricCard
-            icon={ReceiptText}
-            label="Tracked Invoices"
-            value={invoiceAging?.totals?.trackedInvoices ?? 0}
-            sub="Invoices represented in reminder analytics."
-          />
-          <MetricCard
-            icon={Clock3}
-            label="Scheduled Rules"
-            value={invoiceAging?.totals?.scheduledReminderRules ?? 0}
-            sub="Reminder rules still scheduled."
-          />
-          <MetricCard
-            icon={CheckCircle2}
-            label="Processed Rules"
-            value={invoiceAging?.totals?.processedReminderRules ?? 0}
-            sub="Rules already processed."
-          />
-          <MetricCard
-            icon={AlertTriangle}
-            label="Cancelled Rules"
-            value={invoiceAging?.totals?.cancelledReminderRules ?? 0}
-            sub="Rules cancelled before processing."
-          />
-        </div>
-
-        <div className="mt-5 grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-          <div className="rounded-3xl border border-surface-border bg-surface-card p-4">
-            <p className="text-sm font-bold text-ink-primary">Aging Buckets</p>
-            <div className="mt-4 grid gap-3">
-              {agingBuckets.length ? (
-                agingBuckets.map((bucket) => (
-                  <div key={bucket.bucket} className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface-raised px-4 py-3">
-                    <span className="text-sm text-ink-secondary">{bucket.label ?? formatLabel(bucket.bucket)}</span>
-                    <span className="text-xl font-black text-ink-primary">{bucket.count}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm leading-6 text-ink-muted">
-                  No aging buckets are present in the latest analytics snapshot.
-                </p>
-              )}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="badge badge-gray">{agingLoadLabel}</span>
+              <Link href="/admin/summaries" className="badge badge-blue">
+                Open analytics hub
+              </Link>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-surface-border bg-surface-card p-4">
-            <p className="text-sm font-bold text-ink-primary">Tracked Reminder Policies</p>
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
-                    <th className="px-4 py-3 font-semibold">Invoice</th>
-                    <th className="px-4 py-3 font-semibold">Latest Status</th>
-                    <th className="px-4 py-3 font-semibold">Scheduled For</th>
-                    <th className="px-4 py-3 font-semibold">Rule Count</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-border">
-                  {trackedInvoicePolicies.length ? (
-                    trackedInvoicePolicies.map((policy) => (
-                      <tr key={policy.invoiceId} className="hover:bg-surface-hover">
-                        <td className="px-4 py-3.5 font-semibold text-ink-primary break-all">{policy.invoiceId}</td>
-                        <td className="px-4 py-3.5 text-ink-secondary">{policy.latestReminderStatus}</td>
-                        <td className="px-4 py-3.5 text-ink-secondary">{policy.latestScheduledForLabel}</td>
-                        <td className="px-4 py-3.5 font-bold text-ink-primary">{policy.reminderRuleIds?.length ?? 0}</td>
-                      </tr>
+          <div className="mt-4 grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
+            <div className="space-y-4">
+              <div className="ops-panel-muted">
+                <p className="text-sm font-bold text-ink-primary">Payment-state boundary</p>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">{staffInvoiceOrderPaymentCopy}</p>
+              </div>
+
+              {jobOrderState.message ? (
+                <div className={`rounded-xl border px-4 py-3 text-xs ${getLoadMessageToneClass(jobOrderState.status)}`}>
+                  {jobOrderState.message}
+                </div>
+              ) : null}
+
+              {ecommerceState.message ? (
+                <div className={`rounded-xl border px-4 py-3 text-xs ${getLoadMessageToneClass(ecommerceState.status)}`}>
+                  {ecommerceState.message}
+                </div>
+              ) : null}
+
+              {agingState.message ? (
+                <div className={`rounded-xl border px-4 py-3 text-xs ${getLoadMessageToneClass(agingState.status)}`}>
+                  {agingState.message}
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl border border-surface-border bg-surface-raised p-4">
+                <p className="text-sm font-bold text-ink-primary">Aging Buckets</p>
+                <div className="mt-4 grid gap-3">
+                  {agingBuckets.length ? (
+                    agingBuckets.map((bucket) => (
+                      <div key={bucket.bucket} className="flex items-center justify-between gap-3 rounded-xl border border-surface-border bg-surface-card px-4 py-3">
+                        <span className="text-sm text-ink-secondary">{bucket.label ?? formatLabel(bucket.bucket)}</span>
+                        <span className="text-xl font-black text-ink-primary">{bucket.count}</span>
+                      </div>
                     ))
                   ) : (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-ink-muted">
-                        No tracked reminder policies are present in the latest snapshot.
-                      </td>
-                    </tr>
+                    <p className="text-sm leading-6 text-ink-muted">
+                      No aging buckets are present in the latest analytics snapshot.
+                    </p>
                   )}
-                </tbody>
-              </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-ink-primary">Tracked Reminder Policies</p>
+                  <p className="mt-1 text-xs leading-5 text-ink-muted">
+                    Reminder analytics remain read-only here and may lag owner workflow writes.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadInvoiceAging()}
+                  disabled={agingState.status === 'invoice_order_loading'}
+                  className="ops-action-secondary sm:min-w-[148px]"
+                >
+                  <RefreshCcw size={14} className={agingState.status === 'invoice_order_loading' ? 'animate-spin' : undefined} />
+                  Refresh Aging
+                </button>
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead>
+                    <tr className="border-b border-surface-border text-left text-xs text-ink-muted">
+                      <th className="px-4 py-3 font-semibold">Invoice</th>
+                      <th className="px-4 py-3 font-semibold">Latest Status</th>
+                      <th className="px-4 py-3 font-semibold">Scheduled For</th>
+                      <th className="px-4 py-3 font-semibold">Rule Count</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-surface-border">
+                    {trackedInvoicePolicies.length ? (
+                      trackedInvoicePolicies.map((policy) => (
+                        <tr key={policy.invoiceId} className="hover:bg-surface-hover">
+                          <td className="px-4 py-3.5 font-semibold text-ink-primary break-all">{policy.invoiceId}</td>
+                          <td className="px-4 py-3.5 text-ink-secondary">{policy.latestReminderStatus}</td>
+                          <td className="px-4 py-3.5 text-ink-secondary">{policy.latestScheduledForLabel}</td>
+                          <td className="px-4 py-3.5 font-bold text-ink-primary">{policy.reminderRuleIds?.length ?? 0}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-ink-muted">
+                          No tracked reminder policies are present in the latest snapshot.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
-      </SectionShell>
 
-      <SectionShell
-        title="Workflow Coverage"
-        description="This page keeps demo-visible finance actions clear while future queue work stays separated from the current workflow."
-      >
-        <div className="space-y-5">
-          <RouteLedger routes={allSurfaceRoutes} />
-          <div className="rounded-3xl border border-surface-border bg-surface-card p-4">
-            <p className="text-sm font-bold text-ink-primary">Actions intentionally not duplicated here</p>
-            <p className="mt-2 text-sm leading-6 text-ink-muted">
-              Service payment remains in the Job Order Workbench. Ecommerce order status, cancel,
-              invoice payment entry, and invoice status actions are handled by their owner workspaces, but this hub keeps
-              them read-only until a dedicated staff ecommerce queue is built.
-            </p>
-            <RouteLedger
-              routes={[
-                staffInvoiceOrderActionRoutes.serviceInvoicePayment,
-                staffInvoiceOrderActionRoutes.ecommerceOrderStatus,
-                staffInvoiceOrderActionRoutes.ecommerceOrderCancel,
-                staffInvoiceOrderActionRoutes.ecommerceInvoicePaymentEntry,
-                staffInvoiceOrderActionRoutes.ecommerceInvoiceStatus,
-              ]}
-            />
+        <div className="grid gap-5 xl:grid-cols-2">
+          <div className="ops-panel">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="card-title">Job Order Billing Detail</p>
+                <p className="mt-1 text-sm leading-6 text-ink-muted">
+                  Inspect a loaded job order to confirm invoice-ready state, recorded payment details, and the
+                  owner workflow that still controls service billing actions.
+                </p>
+              </div>
+              <span className="badge badge-gray">{jobOrderLoadLabel}</span>
+            </div>
+
+            {jobOrderState.jobOrder ? (
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <DetailTile label="Job Order" value={`JO-${shortId(jobOrderState.jobOrder.id)}`} />
+                  <DetailTile label="Status" value={formatLabel(jobOrderState.jobOrder.status)} />
+                  <DetailTile label="Source" value={formatLabel(jobOrderState.jobOrder.sourceType)} />
+                </div>
+
+                {serviceInvoice ? (
+                  <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-orange">
+                          Service Invoice-Ready Record
+                        </p>
+                        <p className="mt-2 text-xl font-bold text-ink-primary">{serviceInvoice.invoiceReference}</p>
+                      </div>
+                      <StatusBadge value={serviceInvoice.paymentStatus} />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <DetailTile label="Amount Recorded" value={formatInvoiceOrderCurrency(serviceInvoice.amountPaidCents)} />
+                      <DetailTile label="Payment Method" value={formatLabel(serviceInvoice.paymentMethod, 'Not recorded')} />
+                      <DetailTile label="Paid At" value={formatDateTime(serviceInvoice.paidAt)} />
+                      <DetailTile label="Finalized By" value={serviceInvoice.finalizedByUserId} breakAll />
+                    </div>
+
+                    <p className="mt-4 text-sm leading-6 text-ink-muted">
+                      Service invoice payment can be recorded from the Job Order Workbench only after invoice-ready finalization.
+                    </p>
+                  </div>
+                ) : (
+                  <InfoPanel
+                    icon={Clock3}
+                    title="Not invoice-ready yet"
+                    body="This job order has not produced an invoice-ready record. Use the Job Order Workbench to complete work evidence, QA gates, and finalization."
+                    tone="warning"
+                  />
+                )}
+
+                <Link href="/admin/job-orders" className="btn-ghost w-fit">
+                  <ExternalLink size={14} />
+                  Open Job Order Workbench
+                </Link>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-surface-border bg-surface-raised px-5 py-10 text-center">
+                <Wrench size={24} className="mx-auto text-ink-muted" />
+                <p className="mt-3 text-sm font-bold text-ink-primary">Load a job order from the control strip</p>
+                <p className="mt-2 text-xs leading-6 text-ink-muted">
+                  This panel stays focused on finalized service billing detail and does not create placeholder queue data.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="ops-panel">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="card-title">Ecommerce Order Detail</p>
+                <p className="mt-1 text-sm leading-6 text-ink-muted">
+                  Review a known ecommerce order snapshot and its linked invoice detail without duplicating the
+                  owner workflows that manage fulfillment or billing updates.
+                </p>
+              </div>
+              <span className="badge badge-gray">{ecommerceLoadLabel}</span>
+            </div>
+
+            {ecommerceOrder ? (
+              <div className="mt-4 space-y-4">
+                <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-orange">
+                        Ecommerce Order Snapshot
+                      </p>
+                      <p className="mt-2 text-xl font-bold text-ink-primary">{ecommerceOrder.orderNumber}</p>
+                      <p className="mt-1 break-all text-xs text-ink-muted">{ecommerceOrder.id}</p>
+                    </div>
+                    <StatusBadge value={ecommerceOrder.status} />
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <DetailTile label="Subtotal" value={ecommerceOrder.subtotalLabel} />
+                    <DetailTile label="Items" value={ecommerceOrder.items?.length ?? 0} />
+                    <DetailTile label="Created" value={formatDateTime(ecommerceOrder.createdAt)} />
+                  </div>
+                </div>
+
+                {ecommerceInvoice ? (
+                  <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-orange">
+                          Ecommerce Invoice Tracking
+                        </p>
+                        <p className="mt-2 text-xl font-bold text-ink-primary">{ecommerceInvoice.invoiceNumber}</p>
+                      </div>
+                      <StatusBadge value={ecommerceInvoice.status} />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <DetailTile label="Total" value={ecommerceInvoice.totalLabel} />
+                      <DetailTile label="Amount Due" value={ecommerceInvoice.amountDueLabel} />
+                      <DetailTile label="Aging" value={ecommerceInvoice.agingBucketLabel} />
+                      <DetailTile label="Due At" value={formatDateTime(ecommerceInvoice.dueAt)} />
+                    </div>
+                  </div>
+                ) : ecommerceState.invoiceError ? (
+                  <InfoPanel
+                    icon={AlertTriangle}
+                    title="Invoice detail unavailable"
+                    body={ecommerceState.invoiceError}
+                    tone="warning"
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-surface-border bg-surface-raised px-5 py-10 text-center">
+                <ShoppingBag size={24} className="mx-auto text-ink-muted" />
+                <p className="mt-3 text-sm font-bold text-ink-primary">Known-order lookup only</p>
+                <p className="mt-2 text-xs leading-6 text-ink-muted">
+                  Paste a known ecommerce order id to load live order and invoice detail. If there is no id yet,
+                  this panel stays empty instead of showing placeholder queue data.
+                </p>
+              </div>
+            )}
           </div>
         </div>
-      </SectionShell>
+
+        <div className="ops-panel">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="card-title">Payment Entries</p>
+              <p className="mt-1 text-sm leading-6 text-ink-muted">
+                Keep recorded payment entries visible here while preserving the owner systems that actually create
+                or settle those records.
+              </p>
+            </div>
+            <span className="badge badge-gray">
+              {ecommerceInvoice ? `${paymentEntries.length} tracked` : 'Awaiting invoice detail'}
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-4 xl:grid-cols-[0.88fr_1.12fr]">
+            <div className="space-y-4">
+              <div className="ops-panel-muted">
+                <p className="text-sm font-bold text-ink-primary">Service payment record</p>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">
+                  {serviceInvoice
+                    ? `${formatInvoiceOrderCurrency(serviceInvoice.amountPaidCents)} via ${formatLabel(serviceInvoice.paymentMethod, 'unrecorded method')} on ${formatDateTime(serviceInvoice.paidAt)}.`
+                    : 'Service payment recording still happens in the Job Order Workbench after finalization.'}
+                </p>
+              </div>
+
+              <div className="ops-panel-muted">
+                <p className="text-sm font-bold text-ink-primary">Ecommerce invoice coverage</p>
+                <p className="mt-2 text-sm leading-6 text-ink-muted">
+                  {ecommerceState.invoiceError
+                    ? ecommerceState.invoiceError
+                    : ecommerceInvoice
+                      ? `Invoice ${ecommerceInvoice.invoiceNumber} is visible here with ${paymentEntries.length} tracked payment entr${paymentEntries.length === 1 ? 'y' : 'ies'}.`
+                      : 'Load a known ecommerce order to inspect invoice payment-entry history.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+              <PaymentEntries entries={paymentEntries} />
+            </div>
+          </div>
+        </div>
+
+        <div className="ops-panel">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="card-title">Action Routes / Surface Rules</p>
+              <p className="mt-1 text-sm leading-6 text-ink-muted">
+                Make the current finance surface boundaries explicit so staff can see what is live here versus
+                what remains owned by job-order or ecommerce-specific workspaces.
+              </p>
+            </div>
+            <span className="badge badge-blue">{allSurfaceRoutes.length} linked routes</span>
+          </div>
+
+          <div className="mt-4 space-y-5">
+            <RouteLedger routes={allSurfaceRoutes} />
+            <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+              <p className="text-sm font-bold text-ink-primary">Actions intentionally not duplicated here</p>
+              <p className="mt-2 text-sm leading-6 text-ink-muted">
+                Service payment remains in the Job Order Workbench. Ecommerce order status, cancel, invoice
+                payment entry, and invoice status actions are handled by their owner workspaces while this hub
+                stays read-only until a dedicated staff ecommerce queue is built.
+              </p>
+              <div className="mt-4">
+                <RouteLedger
+                  routes={[
+                    staffInvoiceOrderActionRoutes.serviceInvoicePayment,
+                    staffInvoiceOrderActionRoutes.ecommerceOrderStatus,
+                    staffInvoiceOrderActionRoutes.ecommerceOrderCancel,
+                    staffInvoiceOrderActionRoutes.ecommerceInvoicePaymentEntry,
+                    staffInvoiceOrderActionRoutes.ecommerceInvoiceStatus,
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
