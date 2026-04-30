@@ -104,18 +104,41 @@ function StatCard({ icon: Icon, label, value, toneClass }) {
   )
 }
 
-function WorkflowStep({ number, title, copy }) {
+function EmptyPanelState({ title, copy }) {
   return (
-    <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-orange/10 text-sm font-black text-brand-orange">
-          {number}
-        </div>
-        <div>
-          <p className="text-sm font-bold text-ink-primary">{title}</p>
-          <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy}</p>
-        </div>
-      </div>
+    <div className="rounded-2xl border border-dashed border-surface-border bg-surface-raised px-5 py-10 text-center">
+      <ShieldCheck size={28} className="mx-auto text-ink-muted" />
+      <p className="mt-3 text-sm font-bold text-ink-primary">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-ink-muted">{copy}</p>
+    </div>
+  )
+}
+
+function StatusMessage({ state }) {
+  if (!state.message) return null
+
+  const toneClass =
+    state.status === 'qa_loaded'
+      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+      : state.status === 'qa_unavailable'
+        ? 'border-amber-500/25 bg-amber-500/10 text-amber-100'
+        : 'border-red-500/25 bg-red-500/10 text-red-200'
+
+  return <div className={`rounded-xl border px-4 py-3 text-sm ${toneClass}`}>{state.message}</div>
+}
+
+function OverrideMessage({ state }) {
+  if (!state.message) return null
+
+  return (
+    <div
+      className={`rounded-xl border px-4 py-3 text-sm ${
+        state.status === 'override_saved'
+          ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+          : 'border-red-500/25 bg-red-500/10 text-red-200'
+      }`}
+    >
+      {state.message}
     </div>
   )
 }
@@ -136,9 +159,7 @@ function QualityFindingCard({ finding }) {
         <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${severityTone}`}>
           {formatLabel(finding.severity)}
         </span>
-        {riskContribution !== null ? (
-          <span className="badge badge-orange">Risk {riskContribution}</span>
-        ) : null}
+        {riskContribution !== null ? <span className="badge badge-orange">Risk {riskContribution}</span> : null}
       </div>
       <p className="mt-3 text-sm font-semibold text-ink-primary">{finding.code}</p>
       <p className="mt-2 text-sm leading-6 text-ink-secondary">{finding.message}</p>
@@ -156,130 +177,231 @@ function QualityFindingCard({ finding }) {
   )
 }
 
-function LiveQualityGateDetail({ qualityGate }) {
+function ReleaseDecisionPanel({ qualityGate, releaseState }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="card-title">Release Decision</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+            Completion and customer release should follow this QA state, not generic job-order status alone.
+          </p>
+        </div>
+        <span className={`badge ${getReleaseTone(releaseState)}`}>{getReleaseCopy(releaseState)}</span>
+      </div>
+      {qualityGate ? (
+        <div className="space-y-4">
+          <div className="ops-panel-muted">
+            <p className="text-xs uppercase tracking-[0.18em] text-ink-muted">Job Order</p>
+            <p className="mt-2 break-all text-sm font-semibold text-ink-primary">{qualityGate.jobOrderId}</p>
+          </div>
+          {qualityGate.blockingReason ? (
+            <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              {qualityGate.blockingReason}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <EmptyPanelState
+          title="No QA gate loaded"
+          copy="Load a known ready-for-QA job order from the Job Order Workbench to review its live release decision."
+        />
+      )}
+    </div>
+  )
+}
+
+function FindingsReviewPanel({ qualityGate }) {
   if (!qualityGate) {
     return (
-      <div className="mt-5 rounded-2xl border border-dashed border-surface-border bg-surface-raised px-5 py-10 text-center">
-        <ShieldCheck size={28} className="mx-auto text-ink-muted" />
-        <p className="mt-3 text-sm font-bold text-ink-primary">No QA gate loaded</p>
-        <p className="mt-2 text-sm leading-6 text-ink-muted">
-          Load a known ready-for-QA job order from the Job Order Workbench. This page will stay empty until live QA data is available.
-        </p>
+      <div className="space-y-4">
+        <div>
+          <p className="card-title">Findings Review</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+            Blocking and review-needed findings stay grouped here once a live QA gate is loaded.
+          </p>
+        </div>
+        <EmptyPanelState
+          title="No findings to review yet"
+          copy="This panel will show live severity, provenance, and risk contribution details after a QA gate is loaded."
+        />
       </div>
     )
   }
 
-  const releaseState = getQualityGateReleaseState(qualityGate)
   const findings = Array.isArray(qualityGate.findings) ? qualityGate.findings : []
   const blockingFindings = getBlockingQualityGateFindings(qualityGate)
   const reviewFindings = getReviewNeededQualityGateFindings(qualityGate)
-  const latestOverride = getLatestQualityGateOverride(qualityGate)
-  const releaseAllowed = isQualityGateReleaseAllowed(qualityGate)
-  const releaseBlocked = isQualityGateReleaseBlocked(qualityGate)
 
   return (
-    <div className="mt-5 space-y-5">
-      <div className="grid gap-4 md:grid-cols-4">
-        <StatCard
-          icon={ShieldCheck}
-          label="QA Status"
-          value={formatLabel(qualityGate.status)}
-          toneClass={qualityGate.status === 'blocked' ? 'border-red-500/15 bg-red-500/10 text-red-400' : 'border-emerald-500/15 bg-emerald-500/10 text-emerald-400'}
-        />
-        <StatCard
-          icon={AlertTriangle}
-          label="Risk Score"
-          value={qualityGate.riskScore}
-          toneClass={qualityGate.riskScore >= 60 ? 'border-red-500/15 bg-red-500/10 text-red-400' : 'border-brand-orange/15 bg-brand-orange/10 text-brand-orange'}
-        />
-        <StatCard
-          icon={ClipboardCheck}
-          label="Blocking Findings"
-          value={blockingFindings.length}
-          toneClass="border-amber-500/15 bg-amber-500/10 text-amber-300"
-        />
-        <StatCard
-          icon={BadgeCheck}
-          label="Release"
-          value={releaseAllowed ? 'Allowed' : releaseBlocked ? 'Blocked' : 'Unavailable'}
-          toneClass={releaseAllowed ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-400' : 'border-red-500/15 bg-red-500/10 text-red-400'}
-        />
-      </div>
-
-      <div className="rounded-2xl border border-surface-border bg-surface-raised p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-ink-primary">Release Decision</p>
-            <p className="mt-1 text-sm text-ink-secondary">
-              Completion and customer release should follow this QA state, not generic job-order status alone.
-            </p>
-          </div>
-          <span className={`badge ${getReleaseTone(releaseState)}`}>{getReleaseCopy(releaseState)}</span>
-        </div>
-        {qualityGate.blockingReason ? (
-          <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-            {qualityGate.blockingReason}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="card-title">Findings Review</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+            Review blocking and advisory findings before approving release or recording an override.
           </p>
-        ) : null}
+        </div>
+        <span className={`badge ${getQualityStatusTone(qualityGate.status)}`}>{formatLabel(qualityGate.status)}</span>
       </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-surface-border bg-surface-card p-4">
-          <p className="text-sm font-semibold text-ink-primary">Audit Worker</p>
-          <dl className="mt-3 grid gap-3 text-sm text-ink-secondary">
-            <div className="flex justify-between gap-4">
-              <dt className="text-ink-muted">Requested</dt>
-              <dd>{formatDateTime(qualityGate.lastAuditRequestedAt)}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-ink-muted">Completed</dt>
-              <dd>{formatDateTime(qualityGate.lastAuditCompletedAt)}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-ink-muted">Queue status</dt>
-              <dd>{formatLabel(qualityGate.auditJob?.status ?? 'not_available')}</dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className="rounded-2xl border border-surface-border bg-surface-card p-4">
-          <p className="text-sm font-semibold text-ink-primary">Override Audit</p>
-          {latestOverride ? (
-            <div className="mt-3 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-100">
-              <p className="font-semibold">{formatLabel(latestOverride.actorRole)} override</p>
-              <p className="mt-2 leading-6">{latestOverride.reason}</p>
-              <p className="mt-2 text-xs text-blue-200">{formatDateTime(latestOverride.createdAt)}</p>
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-ink-muted">
-              No override has been recorded. Blocked gates require a super-admin reason before release can continue.
-            </p>
-          )}
-        </section>
+      <div className="flex flex-wrap gap-2">
+        <span className="badge badge-red">{blockingFindings.length} blocking</span>
+        <span className="badge badge-orange">{reviewFindings.length} review needed</span>
       </div>
-
-      <section>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-ink-primary">Findings</p>
-            <p className="mt-1 text-xs text-ink-muted">
-              {blockingFindings.length} blocking and {reviewFindings.length} review-needed finding(s).
-            </p>
+      <div className="grid gap-3 xl:grid-cols-2">
+        {findings.length ? (
+          findings.map((finding) => <QualityFindingCard key={finding.id} finding={finding} />)
+        ) : (
+          <div className="rounded-2xl border border-surface-border bg-surface-card p-4 text-sm text-ink-muted">
+            No findings have been recorded yet.
           </div>
-          <span className={`badge ${getQualityStatusTone(qualityGate.status)}`}>{formatLabel(qualityGate.status)}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AuditTimelinePanel({ qualityGate, releaseState }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="card-title">Audit Timeline / Worker Detail</p>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">
+          Monitor audit request timing, worker completion, and the release state that staff should follow.
+        </p>
+      </div>
+      {qualityGate ? (
+        <div className="grid gap-3 text-sm text-ink-secondary">
+          <div className="ops-panel-muted flex items-center justify-between gap-4">
+            <span className="text-ink-muted">Requested</span>
+            <span>{formatDateTime(qualityGate.lastAuditRequestedAt)}</span>
+          </div>
+          <div className="ops-panel-muted flex items-center justify-between gap-4">
+            <span className="text-ink-muted">Completed</span>
+            <span>{formatDateTime(qualityGate.lastAuditCompletedAt)}</span>
+          </div>
+          <div className="ops-panel-muted flex items-center justify-between gap-4">
+            <span className="text-ink-muted">Queue status</span>
+            <span>{formatLabel(qualityGate.auditJob?.status ?? 'not_available')}</span>
+          </div>
+          <div className="ops-panel-muted flex items-center justify-between gap-4">
+            <span className="text-ink-muted">Release state</span>
+            <span>{formatLabel(releaseState)}</span>
+          </div>
         </div>
-        <div className="mt-3 grid gap-3 xl:grid-cols-2">
-          {findings.length ? (
-            findings.map((finding) => (
-              <QualityFindingCard key={finding.id} finding={finding} />
-            ))
-          ) : (
-            <div className="rounded-2xl border border-surface-border bg-surface-card p-4 text-sm text-ink-muted">
-              No findings have been recorded yet.
-            </div>
-          )}
+      ) : (
+        <EmptyPanelState
+          title="No audit worker detail available"
+          copy="Once a gate is loaded, this panel will show the last audit request, completion, and queue state."
+        />
+      )}
+    </div>
+  )
+}
+
+function OverrideAuditPanel({
+  canOverrideLiveQa,
+  overrideReason,
+  overrideState,
+  qualityGate,
+  releaseState,
+  onOverrideReasonChange,
+  onSubmit,
+}) {
+  const latestOverride = qualityGate ? getLatestQualityGateOverride(qualityGate) : null
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="card-title">Override Audit</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+            Overrides remain fully auditable and never remove the original QA findings that caused the release block.
+          </p>
         </div>
-      </section>
+        <span className={`badge ${getReleaseTone(releaseState)}`}>{getReleaseCopy(releaseState)}</span>
+      </div>
+      {latestOverride ? (
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-100">
+          <p className="font-semibold">{formatLabel(latestOverride.actorRole)} override</p>
+          <p className="mt-2 leading-6">{latestOverride.reason}</p>
+          <p className="mt-2 text-xs text-blue-200">{formatDateTime(latestOverride.createdAt)}</p>
+        </div>
+      ) : (
+        <div className="ops-panel-muted text-sm leading-6 text-ink-muted">
+          No override has been recorded. Blocked gates require a super-admin reason before release can continue.
+        </div>
+      )}
+      <label className="block text-xs text-ink-muted">
+        Override reason
+        <textarea
+          value={overrideReason}
+          onChange={(event) => onOverrideReasonChange(event.target.value)}
+          rows={4}
+          disabled={!qualityGate || !canOverrideLiveQa || qualityGate.status !== 'blocked'}
+          className="mt-1 w-full rounded-xl border border-surface-border bg-surface-card px-4 py-3 text-sm text-ink-primary outline-none focus:border-[#f07c00] disabled:cursor-not-allowed disabled:opacity-60"
+          placeholder="Explain why a supervisor is approving release despite the blocked QA state."
+        />
+      </label>
+      <OverrideMessage state={overrideState} />
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={overrideState.status === 'override_submitting' || !qualityGate || !canOverrideLiveQa || qualityGate.status !== 'blocked'}
+        className="ops-action-danger w-full disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {overrideState.status === 'override_submitting' ? (
+          <RefreshCw size={15} className="animate-spin" />
+        ) : canOverrideLiveQa ? (
+          <ShieldAlert size={15} />
+        ) : (
+          <Lock size={15} />
+        )}
+        Record Manual Override
+      </button>
+    </div>
+  )
+}
+
+function ContractSourcesPanel({ sourceCount }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="card-title">Contract Sources / Linked Context</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
+            QA Audit is a live review and override surface. It does not create inspections, job orders, or fake audit queues.
+          </p>
+        </div>
+        <span className="badge badge-gray">{sourceCount} source references</span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+          <p className="text-sm font-bold text-ink-primary">Staff Action</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+            Load one known job-order id, inspect its findings, then return to Job Orders for execution work.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+          <p className="text-sm font-bold text-ink-primary">Super Admin Action</p>
+          <p className="mt-2 text-sm leading-6 text-ink-secondary">
+            Override only blocked gates, with a clear reason that stays in the audit trail.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
+          <p className="text-sm font-bold text-ink-primary">Next Step</p>
+          <Link href="/admin/job-orders" className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-brand-orange">
+            Continue in Job Orders <ExternalLink size={14} />
+          </Link>
+        </div>
+      </div>
+      <div className="grid gap-3 xl:grid-cols-2">
+        {qualityGateReviewContractSources.map((source) => (
+          <div key={source} className="rounded-2xl border border-surface-border bg-surface-card p-4">
+            <p className="break-all text-sm font-semibold text-ink-primary">{source}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -309,6 +431,9 @@ export default function QAAuditWorkspace() {
 
   const selectedReleaseState = getQualityGateReleaseState(qualityGate)
   const sourceCount = useMemo(() => qualityGateReviewContractSources.length, [])
+  const blockingFindings = qualityGate ? getBlockingQualityGateFindings(qualityGate) : []
+  const releaseAllowed = qualityGate ? isQualityGateReleaseAllowed(qualityGate) : false
+  const releaseBlocked = qualityGate ? isQualityGateReleaseBlocked(qualityGate) : false
 
   async function loadQualityGate() {
     if (!jobOrderId.trim()) {
@@ -454,52 +579,28 @@ export default function QAAuditWorkspace() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="card relative overflow-hidden p-6 md:p-7">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-72 bg-gradient-to-l from-brand-orange/10 to-transparent" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-orange">Live QA Operations</p>
-            <h1 className="mt-3 text-3xl font-bold text-ink-primary">Quality Gate Review And Override</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-secondary">
-              Load a real job order QA gate, review findings and release blocks, then record super-admin overrides when an exception is justified.
-            </p>
-          </div>
-          <Link href="/admin/job-orders" className="btn-primary">
-            <ClipboardCheck size={15} />
-            Open Job Orders
-          </Link>
+    <div className="ops-page-shell">
+      <section className="ops-page-header">
+        <div className="space-y-2">
+          <p className="ops-page-kicker">Quality Governance</p>
+          <h1 className="ops-page-title">QA Audit Workspace</h1>
+          <p className="ops-page-copy">
+            Review live quality gates, scan blocking findings, and record auditable overrides when release exceptions are justified.
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={loadQualityGate}
+          className="ops-action-secondary min-w-[148px] self-start xl:self-auto"
+        >
+          <RefreshCw size={14} className={qaState.status === 'qa_loading' ? 'animate-spin' : undefined} />
+          Refresh
+        </button>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-4">
-        <WorkflowStep number="1" title="Open Job Order" copy="Find or create the job order from a confirmed booking in the Job Order Workbench." />
-        <WorkflowStep number="2" title="Move To QA" copy="Use status and evidence actions until the job order reaches the QA-ready backend state." />
-        <WorkflowStep number="3" title="Load Gate Here" copy="Paste the job-order id below to review live QA findings, risk, and release state." />
-        <WorkflowStep number="4" title="Override Only If Needed" copy="Super admins can override blocked gates with a reason; original findings stay visible." />
-      </section>
-
-      <section className="card p-5 md:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="card-title">QA Gate Lookup</p>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
-              Paste one job-order id to review its QA findings and release state. A broad QA queue is planned later,
-              so this page intentionally shows an empty state until staff load a known job order.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span className={`badge ${canReadLiveQa ? 'badge-green' : 'badge-red'}`}>
-              Read: {canReadLiveQa ? formatLabel(role) : 'Forbidden role'}
-            </span>
-            <span className={`badge ${canOverrideLiveQa ? 'badge-green' : 'badge-gray'}`}>
-              Override: {canOverrideLiveQa ? 'Super Admin' : 'Locked'}
-            </span>
-          </div>
-        </div>
-
+      <section className="ops-control-strip">
         <form
-          className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]"
+          className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]"
           onSubmit={(event) => {
             event.preventDefault()
             loadQualityGate()
@@ -514,113 +615,102 @@ export default function QAAuditWorkspace() {
               placeholder="Paste a ready-for-QA job-order UUID"
             />
           </label>
-          <button type="submit" disabled={qaState.status === 'qa_loading'} className="btn-primary self-end">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`badge ${canReadLiveQa ? 'badge-green' : 'badge-red'}`}>
+              Read: {canReadLiveQa ? formatLabel(role) : 'Forbidden role'}
+            </span>
+            <span className={`badge ${canOverrideLiveQa ? 'badge-green' : 'badge-gray'}`}>
+              Override: {canOverrideLiveQa ? 'Super Admin' : 'Locked'}
+            </span>
+          </div>
+          <button type="submit" disabled={qaState.status === 'qa_loading'} className="ops-action-primary">
             {qaState.status === 'qa_loading' ? (
-              <RefreshCw size={15} className="animate-spin" />
+              <RefreshCw size={14} className="animate-spin" />
             ) : (
-              <Search size={15} />
+              <Search size={14} />
             )}
-            Load Live QA
+            Load QA Gate
           </button>
         </form>
-
-        {qaState.message ? (
-          <div
-            className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
-              qaState.status === 'qa_loaded'
-                ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
-                : qaState.status === 'qa_unavailable'
-                  ? 'border-amber-500/25 bg-amber-500/10 text-amber-100'
-                  : 'border-red-500/25 bg-red-500/10 text-red-200'
-            }`}
-          >
-            {qaState.message}
-          </div>
-        ) : null}
-
-        <LiveQualityGateDetail qualityGate={qualityGate} />
-
-        {qualityGate ? (
-          <div className="mt-5 rounded-2xl border border-surface-border bg-surface-raised p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-ink-primary">Super-Admin Override</p>
-                <p className="mt-1 text-sm text-ink-secondary">
-                  Overrides are only enabled for blocked gates and never delete original QA findings.
-                </p>
-              </div>
-              <span className={`badge ${getReleaseTone(selectedReleaseState)}`}>{getReleaseCopy(selectedReleaseState)}</span>
-            </div>
-            <label className="mt-4 block text-xs text-ink-muted">
-              Override reason
-              <textarea
-                value={overrideReason}
-                onChange={(event) => setOverrideReason(event.target.value)}
-                rows={4}
-                disabled={!canOverrideLiveQa || qualityGate.status !== 'blocked'}
-                className="mt-1 w-full rounded-xl border border-surface-border bg-surface-card px-4 py-3 text-sm text-ink-primary outline-none focus:border-[#f07c00] disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="Explain why a supervisor is approving release despite the blocked QA state."
-              />
-            </label>
-            {overrideState.message ? (
-              <div
-                className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
-                  overrideState.status === 'override_saved'
-                    ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
-                    : 'border-red-500/25 bg-red-500/10 text-red-200'
-                }`}
-              >
-                {overrideState.message}
-              </div>
-            ) : null}
-            <button
-              type="button"
-              onClick={handleOverrideQualityGate}
-              disabled={overrideState.status === 'override_submitting' || !canOverrideLiveQa || qualityGate.status !== 'blocked'}
-              className="btn-danger mt-3 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {overrideState.status === 'override_submitting' ? (
-                <RefreshCw size={15} className="animate-spin" />
-              ) : canOverrideLiveQa ? (
-                <ShieldAlert size={15} />
-              ) : (
-                <Lock size={15} />
-              )}
-              Record Manual Override
-            </button>
-          </div>
-        ) : null}
+        <StatusMessage state={qaState} />
       </section>
 
-      <section className="card p-5 md:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="card-title">What This Page Does</p>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
-              QA Audit is a live review and override surface. It does not create inspections, job orders, or fake audit queues.
-            </p>
-          </div>
-          <span className="badge badge-gray">{sourceCount} source references</span>
+      <section className="ops-summary-grid">
+        <StatCard
+          icon={ShieldCheck}
+          label="QA Status"
+          value={qualityGate ? formatLabel(qualityGate.status) : 'Awaiting Load'}
+          toneClass={
+            qualityGate
+              ? qualityGate.status === 'blocked'
+                ? 'border-red-500/15 bg-red-500/10 text-red-400'
+                : 'border-emerald-500/15 bg-emerald-500/10 text-emerald-400'
+              : 'border-surface-border bg-surface-raised text-ink-muted'
+          }
+        />
+        <StatCard
+          icon={AlertTriangle}
+          label="Risk Score"
+          value={qualityGate ? qualityGate.riskScore : '—'}
+          toneClass={
+            qualityGate
+              ? qualityGate.riskScore >= 60
+                ? 'border-red-500/15 bg-red-500/10 text-red-400'
+                : 'border-brand-orange/15 bg-brand-orange/10 text-brand-orange'
+              : 'border-surface-border bg-surface-raised text-ink-muted'
+          }
+        />
+        <StatCard
+          icon={ClipboardCheck}
+          label="Blocking Findings"
+          value={blockingFindings.length}
+          toneClass={
+            qualityGate
+              ? 'border-amber-500/15 bg-amber-500/10 text-amber-300'
+              : 'border-surface-border bg-surface-raised text-ink-muted'
+          }
+        />
+        <StatCard
+          icon={BadgeCheck}
+          label="Release"
+          value={releaseAllowed ? 'Allowed' : releaseBlocked ? 'Blocked' : qualityGate ? 'Pending' : 'Awaiting Load'}
+          toneClass={
+            qualityGate
+              ? releaseAllowed
+                ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-400'
+                : releaseBlocked
+                  ? 'border-red-500/15 bg-red-500/10 text-red-400'
+                  : 'border-amber-500/15 bg-amber-500/10 text-amber-300'
+              : 'border-surface-border bg-surface-raised text-ink-muted'
+          }
+        />
+      </section>
+
+      <section className="space-y-5">
+        <div className="ops-panel">
+          <ReleaseDecisionPanel qualityGate={qualityGate} releaseState={selectedReleaseState} />
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
-            <p className="text-sm font-bold text-ink-primary">Staff Action</p>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              Load one known job-order id, inspect its findings, then return to Job Orders for execution work.
-            </p>
+        <div className="ops-panel">
+          <FindingsReviewPanel qualityGate={qualityGate} />
+        </div>
+        <div className="grid gap-5 xl:grid-cols-2">
+          <div className="ops-panel">
+            <AuditTimelinePanel qualityGate={qualityGate} releaseState={selectedReleaseState} />
           </div>
-          <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
-            <p className="text-sm font-bold text-ink-primary">Super Admin Action</p>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">
-              Override only blocked gates, with a clear reason that stays in the audit trail.
-            </p>
+          <div className="ops-panel">
+            <OverrideAuditPanel
+              canOverrideLiveQa={canOverrideLiveQa}
+              overrideReason={overrideReason}
+              overrideState={overrideState}
+              qualityGate={qualityGate}
+              releaseState={selectedReleaseState}
+              onOverrideReasonChange={setOverrideReason}
+              onSubmit={handleOverrideQualityGate}
+            />
           </div>
-          <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
-            <p className="text-sm font-bold text-ink-primary">Next Step</p>
-            <Link href="/admin/job-orders" className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-brand-orange">
-              Continue in Job Orders <ExternalLink size={14} />
-            </Link>
-          </div>
+        </div>
+        <div className="ops-panel">
+          <ContractSourcesPanel sourceCount={sourceCount} />
         </div>
       </section>
     </div>
