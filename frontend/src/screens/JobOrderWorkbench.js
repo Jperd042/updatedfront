@@ -381,10 +381,10 @@ export default function JobOrderWorkbench() {
     setCreateState(initialCreateState)
   }, [selectedCandidate])
 
-  const clearBookingCreateContext = useCallback(() => {
+  const clearBookingCreateContext = useCallback((nextCreateState = initialCreateState) => {
     setSelectedBookingId('')
     setCreateDraft(emptyCreateDraft)
-    setCreateState(initialCreateState)
+    setCreateState(nextCreateState)
   }, [])
 
   useEffect(() => {
@@ -514,12 +514,12 @@ export default function JobOrderWorkbench() {
           : [],
       })
 
-      setActiveJobOrder(jobOrder)
-      setManualJobOrderId(jobOrder.id)
-      setCreateState({
+      clearBookingCreateContext({
         status: 'create_saved',
         message: `Job order ${jobOrder.id.slice(0, 8).toUpperCase()} created from confirmed booking handoff.`,
       })
+      setActiveJobOrder(jobOrder)
+      setManualJobOrderId(jobOrder.id)
       setHandoffCandidates((current) =>
         current.filter((candidate) => candidate.bookingId !== selectedCandidate.bookingId),
       )
@@ -1043,12 +1043,6 @@ export default function JobOrderWorkbench() {
             </span>
           </div>
         </div>
-
-        {detailState.message ? (
-          <div className={`rounded-xl border px-4 py-3 text-xs mt-4 ${detailStateClassName}`}>
-            {detailState.message}
-          </div>
-        ) : null}
 
         {activeJobOrder ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] mt-4">
