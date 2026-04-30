@@ -128,7 +128,8 @@ function getQualityStatusTone(status) {
 }
 
 function getReleaseTone(state) {
-  if (state === 'release_allowed' || state === 'release_allowed_by_override') return 'badge-green'
+  if (state === 'release_allowed_by_override') return 'badge-blue'
+  if (state === 'release_allowed') return 'badge-green'
   if (state === 'release_blocked') return 'badge-red'
   if (state === 'release_pending_audit') return 'badge-orange'
   return 'badge-gray'

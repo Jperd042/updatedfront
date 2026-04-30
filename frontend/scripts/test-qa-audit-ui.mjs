@@ -59,6 +59,22 @@ if (!file.includes("disabled={qaState.status === 'qa_loading'}")) {
   failures.push('QAAuditWorkspace should disable the header refresh while QA is loading')
 }
 
+const getReleaseToneMatch = file.match(/function getReleaseTone\(state\) \{([\s\S]*?)\n\}/)
+
+if (!getReleaseToneMatch) {
+  failures.push('QAAuditWorkspace should define getReleaseTone for focal release badges')
+} else {
+  const releaseToneBody = getReleaseToneMatch[1]
+  const overrideToneMatch = releaseToneBody.match(/state === 'release_allowed_by_override'\)\s+return\s+'([^']+)'/)
+  const allowedToneMatch = releaseToneBody.match(/state === 'release_allowed'\)\s+return\s+'([^']+)'/)
+
+  if (!overrideToneMatch || !allowedToneMatch) {
+    failures.push('QAAuditWorkspace should map allowed and override release states independently in getReleaseTone')
+  } else if (overrideToneMatch[1] === allowedToneMatch[1]) {
+    failures.push('QAAuditWorkspace should give override-approved release a distinct focal badge tone')
+  }
+}
+
 if (failures.length) {
   console.error('QA Audit UI contract missing:')
   for (const failure of failures) console.error(`- ${failure}`)
