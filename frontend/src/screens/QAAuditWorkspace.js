@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertTriangle,
@@ -26,8 +26,6 @@ import {
   getLatestQualityGateOverride,
   getQualityGateReleaseState,
   getReviewNeededQualityGateFindings,
-  isQualityGateReleaseAllowed,
-  isQualityGateReleaseBlocked,
   qualityGateReviewContractSources,
 } from '@/lib/api/generated/quality-gates/staff-web-qa-review'
 
@@ -40,6 +38,62 @@ const initialOverrideState = {
   status: 'override_ready',
   message: '',
 }
+
+const releaseSummaryByState = {
+  release_allowed: {
+    value: 'Allowed',
+    toneClass: 'border-emerald-500/15 bg-emerald-500/10 text-emerald-400',
+  },
+  release_allowed_by_override: {
+    value: 'Allowed by Override',
+    toneClass: 'border-blue-500/15 bg-blue-500/10 text-blue-300',
+  },
+  release_blocked: {
+    value: 'Blocked',
+    toneClass: 'border-red-500/15 bg-red-500/10 text-red-400',
+  },
+  release_pending_audit: {
+    value: 'Pending Audit',
+    toneClass: 'border-amber-500/15 bg-amber-500/10 text-amber-300',
+  },
+  release_unavailable: {
+    value: 'Awaiting Load',
+    toneClass: 'border-surface-border bg-surface-raised text-ink-muted',
+  },
+}
+
+const findingSeverityPriority = {
+  critical: 0,
+  warning: 1,
+  info: 2,
+}
+
+const findingGroupDefinitions = [
+  {
+    key: 'critical',
+    title: 'Blocking Findings',
+    badgeClass: 'badge-red',
+    matches: (finding) => finding.severity === 'critical',
+  },
+  {
+    key: 'warning',
+    title: 'Review Needed',
+    badgeClass: 'badge-orange',
+    matches: (finding) => finding.severity === 'warning',
+  },
+  {
+    key: 'info',
+    title: 'Informational Findings',
+    badgeClass: 'badge-gray',
+    matches: (finding) => finding.severity === 'info',
+  },
+  {
+    key: 'other',
+    title: 'Additional Findings',
+    badgeClass: 'badge-gray',
+    matches: (finding) => !Object.hasOwn(findingSeverityPriority, finding.severity ?? ''),
+  },
+]
 
 function formatLabel(value) {
   return String(value ?? '')
@@ -85,7 +139,52 @@ function getReleaseCopy(state) {
   if (state === 'release_allowed') return 'Release allowed after QA pass'
   if (state === 'release_blocked') return 'Release blocked by QA findings'
   if (state === 'release_pending_audit') return 'Release pending QA audit'
-  return 'QA unavailable for release'
+  return 'Awaiting QA load before release decision'
+}
+
+function getFindingSortPriority(finding) {
+  const severity = finding?.severity ?? ''
+  return Object.hasOwn(findingSeverityPriority, severity)
+    ? findingSeverityPriority[severity]
+    : findingGroupDefinitions.length
+}
+
+function sortQualityFindings(findings) {
+  return [...findings].sort((left, right) => {
+    const severityDelta = getFindingSortPriority(left) - getFindingSortPriority(right)
+    if (severityDelta !== 0) return severityDelta
+
+    const riskDelta = (getFindingRiskContribution(right) ?? -1) - (getFindingRiskContribution(left) ?? -1)
+    if (riskDelta !== 0) return riskDelta
+
+    const createdAtDelta = String(right.createdAt ?? '').localeCompare(String(left.createdAt ?? ''))
+    if (createdAtDelta !== 0) return createdAtDelta
+
+    return `${left.gate}:${left.code}`.localeCompare(`${right.gate}:${right.code}`)
+  })
+}
+
+function getGroupedQualityFindings(findings) {
+  const sortedFindings = sortQualityFindings(findings)
+  const groupedFindingIds = new Set()
+
+  return findingGroupDefinitions
+    .map((group) => {
+      const items = sortedFindings.filter((finding) => {
+        if (groupedFindingIds.has(finding.id) || !group.matches(finding)) {
+          return false
+        }
+
+        groupedFindingIds.add(finding.id)
+        return true
+      })
+
+      return {
+        ...group,
+        items,
+      }
+    })
+    .filter((group) => group.items.length > 0)
 }
 
 function StatCard({ icon: Icon, label, value, toneClass }) {
@@ -232,6 +331,7 @@ function FindingsReviewPanel({ qualityGate }) {
   const findings = Array.isArray(qualityGate.findings) ? qualityGate.findings : []
   const blockingFindings = getBlockingQualityGateFindings(qualityGate)
   const reviewFindings = getReviewNeededQualityGateFindings(qualityGate)
+  const groupedFindings = getGroupedQualityFindings(findings)
 
   return (
     <div className="space-y-4">
@@ -248,15 +348,27 @@ function FindingsReviewPanel({ qualityGate }) {
         <span className="badge badge-red">{blockingFindings.length} blocking</span>
         <span className="badge badge-orange">{reviewFindings.length} review needed</span>
       </div>
-      <div className="grid gap-3 xl:grid-cols-2">
-        {findings.length ? (
-          findings.map((finding) => <QualityFindingCard key={finding.id} finding={finding} />)
-        ) : (
-          <div className="rounded-2xl border border-surface-border bg-surface-card p-4 text-sm text-ink-muted">
-            No findings have been recorded yet.
-          </div>
-        )}
-      </div>
+      {findings.length ? (
+        <div className="space-y-4">
+          {groupedFindings.map((group) => (
+            <section key={group.key} className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-bold text-ink-primary">{group.title}</p>
+                <span className={`badge ${group.badgeClass}`}>{group.items.length} findings</span>
+              </div>
+              <div className="grid gap-3 xl:grid-cols-2">
+                {group.items.map((finding) => (
+                  <QualityFindingCard key={finding.id} finding={finding} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-surface-border bg-surface-card p-4 text-sm text-ink-muted">
+          No findings have been recorded yet.
+        </div>
+      )}
     </div>
   )
 }
@@ -417,6 +529,7 @@ export default function QAAuditWorkspace() {
   const [overrideReason, setOverrideReason] = useState('')
   const [qaState, setQaState] = useState(initialQaState)
   const [overrideState, setOverrideState] = useState(initialOverrideState)
+  const qaLoadInFlightRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -430,12 +543,15 @@ export default function QAAuditWorkspace() {
   }, [])
 
   const selectedReleaseState = getQualityGateReleaseState(qualityGate)
+  const releaseSummary = releaseSummaryByState[selectedReleaseState] ?? releaseSummaryByState.release_unavailable
   const sourceCount = useMemo(() => qualityGateReviewContractSources.length, [])
   const blockingFindings = qualityGate ? getBlockingQualityGateFindings(qualityGate) : []
-  const releaseAllowed = qualityGate ? isQualityGateReleaseAllowed(qualityGate) : false
-  const releaseBlocked = qualityGate ? isQualityGateReleaseBlocked(qualityGate) : false
 
   async function loadQualityGate() {
+    if (qaLoadInFlightRef.current) {
+      return
+    }
+
     if (!jobOrderId.trim()) {
       setQaState({
         status: 'qa_not_found',
@@ -460,6 +576,7 @@ export default function QAAuditWorkspace() {
       return
     }
 
+    qaLoadInFlightRef.current = true
     setQaState({
       status: 'qa_loading',
       message: '',
@@ -493,6 +610,8 @@ export default function QAAuditWorkspace() {
         status: nextStatus,
         message: error?.message || 'QA gate could not be loaded.',
       })
+    } finally {
+      qaLoadInFlightRef.current = false
     }
   }
 
@@ -591,7 +710,8 @@ export default function QAAuditWorkspace() {
         <button
           type="button"
           onClick={loadQualityGate}
-          className="ops-action-secondary min-w-[148px] self-start xl:self-auto"
+          disabled={qaState.status === 'qa_loading'}
+          className="ops-action-secondary min-w-[148px] self-start disabled:cursor-not-allowed disabled:opacity-60 xl:self-auto"
         >
           <RefreshCw size={14} className={qaState.status === 'qa_loading' ? 'animate-spin' : undefined} />
           Refresh
@@ -673,16 +793,8 @@ export default function QAAuditWorkspace() {
         <StatCard
           icon={BadgeCheck}
           label="Release"
-          value={releaseAllowed ? 'Allowed' : releaseBlocked ? 'Blocked' : qualityGate ? 'Pending' : 'Awaiting Load'}
-          toneClass={
-            qualityGate
-              ? releaseAllowed
-                ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-400'
-                : releaseBlocked
-                  ? 'border-red-500/15 bg-red-500/10 text-red-400'
-                  : 'border-amber-500/15 bg-amber-500/10 text-amber-300'
-              : 'border-surface-border bg-surface-raised text-ink-muted'
-          }
+          value={releaseSummary.value}
+          toneClass={releaseSummary.toneClass}
         />
       </section>
 
