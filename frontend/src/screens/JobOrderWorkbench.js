@@ -56,6 +56,12 @@ const initialCreateState = {
   message: '',
 }
 
+const emptyCreateDraft = {
+  notes: '',
+  items: [],
+  assignedTechnicianIdsText: '',
+}
+
 const initialReadState = {
   status: 'detail_loaded',
   message: '',
@@ -190,11 +196,7 @@ export default function JobOrderWorkbench() {
     message: 'Choose a schedule date and refresh to load confirmed bookings.',
   })
   const [selectedBookingId, setSelectedBookingId] = useState('')
-  const [createDraft, setCreateDraft] = useState({
-    notes: '',
-    items: [],
-    assignedTechnicianIdsText: '',
-  })
+  const [createDraft, setCreateDraft] = useState(emptyCreateDraft)
   const [createState, setCreateState] = useState(initialCreateState)
   const [activeJobOrder, setActiveJobOrder] = useState(null)
   const [manualJobOrderId, setManualJobOrderId] = useState('')
@@ -367,11 +369,7 @@ export default function JobOrderWorkbench() {
 
   useEffect(() => {
     if (!selectedCandidate) {
-      setCreateDraft({
-        notes: '',
-        items: [],
-        assignedTechnicianIdsText: '',
-      })
+      setCreateDraft(emptyCreateDraft)
       return
     }
 
@@ -382,6 +380,12 @@ export default function JobOrderWorkbench() {
     })
     setCreateState(initialCreateState)
   }, [selectedCandidate])
+
+  const clearBookingCreateContext = useCallback(() => {
+    setSelectedBookingId('')
+    setCreateDraft(emptyCreateDraft)
+    setCreateState(initialCreateState)
+  }, [])
 
   useEffect(() => {
     if (!activeJobOrder) {
@@ -432,7 +436,7 @@ export default function JobOrderWorkbench() {
     }
 
     setDetailState({
-      status: 'detail_loaded',
+      status: 'detail_loading',
       message: 'Loading job-order detail...',
     })
 
@@ -442,11 +446,13 @@ export default function JobOrderWorkbench() {
         accessToken: user.accessToken,
       })
 
+      clearBookingCreateContext()
       setActiveJobOrder(jobOrder)
       setManualJobOrderId(jobOrder.id)
       setDetailState({
         status: 'detail_loaded',
-        message: 'Live job-order detail loaded.',
+        message:
+          'Live job-order detail loaded. Booking handoff creation was cleared so this screen stays scoped to the loaded job order.',
       })
     } catch (error) {
       let nextStatus = 'load_failed'
@@ -868,6 +874,13 @@ export default function JobOrderWorkbench() {
     }
   }
 
+  const detailStateClassName =
+    detailState.status === 'detail_loading'
+      ? 'border-surface-border bg-surface-raised text-ink-primary'
+      : detailState.status === 'detail_loaded'
+        ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+        : 'border-red-500/25 bg-red-500/10 text-red-200'
+
   if (!canUseWorkbench) {
     return (
       <div className="ops-page-shell">
@@ -930,6 +943,18 @@ export default function JobOrderWorkbench() {
               <RefreshCw size={14} />
               Load Job Order
             </button>
+
+            {detailState.message ? (
+              <div
+                className={`sm:col-span-2 rounded-xl border px-4 py-3 text-xs ${detailStateClassName}`}
+              >
+                {detailState.message}
+              </div>
+            ) : (
+              <p className="sm:col-span-2 text-[11px] text-ink-muted">
+                Manual lookup pins the loaded job order and clears any armed booking-handoff draft.
+              </p>
+            )}
           </div>
         </div>
 
@@ -998,6 +1023,129 @@ export default function JobOrderWorkbench() {
               : 'Finalization creates the invoice-ready record'
           }
         />
+      </section>
+
+      <section
+        className="ops-panel border-[#f07c00]/35 bg-[linear-gradient(180deg,rgba(240,124,0,0.14),rgba(15,23,42,0.94))] shadow-[0_24px_60px_rgba(15,23,42,0.28)]"
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="card-title">Active Job Order</p>
+            <p className="text-xs text-ink-muted mt-1">
+              The live workshop surface stays pinned above intake so status, assignments, evidence,
+              and invoice readiness remain the primary context after a load or creation event.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="badge badge-blue">Pinned live surface</span>
+            <span className="badge badge-gray">
+              {activeJobOrder ? `JO-${activeJobOrder.id.slice(0, 8).toUpperCase()}` : 'Awaiting live detail'}
+            </span>
+          </div>
+        </div>
+
+        {detailState.message ? (
+          <div className={`rounded-xl border px-4 py-3 text-xs mt-4 ${detailStateClassName}`}>
+            {detailState.message}
+          </div>
+        ) : null}
+
+        {activeJobOrder ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)] mt-4">
+            <div className="grid gap-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-[#f07c00]/30 bg-surface-raised px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
+                    Job Order
+                  </p>
+                  <p className="text-sm text-ink-primary mt-1">
+                    JO-{activeJobOrder.id.slice(0, 8).toUpperCase()}
+                  </p>
+                  <p className="text-xs text-ink-muted mt-2">{activeJobOrder.sourceType} source</p>
+                </div>
+                <div className="rounded-xl border border-[#f07c00]/30 bg-surface-raised px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
+                    Current Status
+                  </p>
+                  <div className="mt-1">
+                    <StatusBadge status={activeJobOrder.status} />
+                  </div>
+                  <p className="text-xs text-ink-muted mt-2">
+                    Updated {formatDateTime(activeJobOrder.updatedAt)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#f07c00]/30 bg-surface-raised px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
+                  Work Items
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {activeJobOrder.items.map((item) => (
+                    <li key={item.id} className="text-sm text-ink-primary">
+                      {item.name}
+                      {item.isCompleted ? ' (completed)' : ''}
+                      {item.estimatedHours ? ` - ${item.estimatedHours}h` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
+                  Assignments
+                </p>
+                <p className="text-sm text-ink-primary mt-1">
+                  {activeJobOrder.assignedTechnicianIds.length > 0
+                    ? activeJobOrder.assignedTechnicianIds.join(', ')
+                    : 'No technician assigned'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
+                  Latest Progress
+                </p>
+                <p className="text-sm text-ink-primary mt-1">
+                  {activeJobOrder.latestProgressEntry?.message ?? 'No progress entry yet'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
+                  Photo Evidence
+                </p>
+                <p className="text-sm text-ink-primary mt-1">{activeJobOrder.photos.length} attached</p>
+                <p className="text-xs text-ink-muted mt-2">
+                  {activeJobOrder.photos[0]?.caption ??
+                    activeJobOrder.photos[0]?.fileName ??
+                    'No photo evidence yet'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
+                  Invoice Record
+                </p>
+                <p className="text-sm text-ink-primary mt-1">
+                  {activeJobOrder.invoiceRecord?.invoiceReference ?? 'Not finalized yet'}
+                </p>
+                <p className="text-xs text-ink-muted mt-2">
+                  {activeJobOrder.invoiceRecord
+                    ? `Payment: ${activeJobOrder.invoiceRecord.paymentStatus}`
+                    : 'Finalization creates the invoice-ready record.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-surface-border bg-surface-card px-4 py-10 text-center mt-4">
+            <AlertTriangle size={28} className="mx-auto text-ink-dim mb-3" />
+            <p className="text-sm font-bold text-ink-primary">No job order loaded yet</p>
+            <p className="text-xs text-ink-muted mt-2">
+              Create a job order from confirmed booking handoff or load a known job-order id.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="ops-workspace-grid">
@@ -1089,8 +1237,9 @@ export default function JobOrderWorkbench() {
               <div>
                 <p className="card-title">Create / Load Job Order</p>
                 <p className="text-xs text-ink-muted mt-1">
-                  Review the service work, assign a technician when ready, and keep booking details
-                  separate from workshop execution notes.
+                  Use this secondary intake surface to convert a confirmed booking into a new job
+                  order. Manual lookup stays in the control strip, while the live job-order
+                  surface remains pinned above.
                 </p>
               </div>
               <span
@@ -1260,118 +1409,6 @@ export default function JobOrderWorkbench() {
                 </button>
               </div>
             )}
-
-            <div className="divider mt-5" />
-
-            <div className="mt-5 space-y-4">
-              <div>
-                <p className="text-sm font-bold text-ink-primary">Live Job-Order Detail</p>
-                <p className="text-xs text-ink-muted mt-1">
-                  Load a created job order from the control strip to inspect its execution state.
-                </p>
-              </div>
-
-              {detailState.message ? (
-                <div
-                  className={`rounded-xl border px-4 py-3 text-xs ${
-                    detailState.status === 'detail_loaded'
-                      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
-                      : 'border-red-500/25 bg-red-500/10 text-red-200'
-                  }`}
-                >
-                  {detailState.message}
-                </div>
-              ) : null}
-
-              {activeJobOrder ? (
-                <div className="grid md:grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
-                      Job Order
-                    </p>
-                    <p className="text-sm text-ink-primary mt-1">
-                      JO-{activeJobOrder.id.slice(0, 8).toUpperCase()}
-                    </p>
-                    <p className="text-xs text-ink-muted mt-2">{activeJobOrder.sourceType} source</p>
-                  </div>
-                  <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
-                      Current Status
-                    </p>
-                    <div className="mt-1">
-                      <StatusBadge status={activeJobOrder.status} />
-                    </div>
-                    <p className="text-xs text-ink-muted mt-2">
-                      Updated {formatDateTime(activeJobOrder.updatedAt)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3 md:col-span-2">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
-                      Work Items
-                    </p>
-                    <ul className="mt-2 space-y-2">
-                      {activeJobOrder.items.map((item) => (
-                        <li key={item.id} className="text-sm text-ink-primary">
-                          {item.name}
-                          {item.isCompleted ? ' (completed)' : ''}
-                          {item.estimatedHours ? ` - ${item.estimatedHours}h` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
-                      Assignments
-                    </p>
-                    <p className="text-sm text-ink-primary mt-1">
-                      {activeJobOrder.assignedTechnicianIds.length > 0
-                        ? activeJobOrder.assignedTechnicianIds.join(', ')
-                        : 'No technician assigned'}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
-                      Latest Progress
-                    </p>
-                    <p className="text-sm text-ink-primary mt-1">
-                      {activeJobOrder.latestProgressEntry?.message ?? 'No progress entry yet'}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
-                      Photo Evidence
-                    </p>
-                    <p className="text-sm text-ink-primary mt-1">{activeJobOrder.photos.length} attached</p>
-                    <p className="text-xs text-ink-muted mt-2">
-                      {activeJobOrder.photos[0]?.caption ??
-                        activeJobOrder.photos[0]?.fileName ??
-                        'No photo evidence yet'}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-surface-border bg-surface-raised px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">
-                      Invoice Record
-                    </p>
-                    <p className="text-sm text-ink-primary mt-1">
-                      {activeJobOrder.invoiceRecord?.invoiceReference ?? 'Not finalized yet'}
-                    </p>
-                    <p className="text-xs text-ink-muted mt-2">
-                      {activeJobOrder.invoiceRecord
-                        ? `Payment: ${activeJobOrder.invoiceRecord.paymentStatus}`
-                        : 'Finalization creates the invoice-ready record.'}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-surface-border bg-surface-card px-4 py-10 text-center">
-                  <AlertTriangle size={28} className="mx-auto text-ink-dim mb-3" />
-                  <p className="text-sm font-bold text-ink-primary">No job order loaded yet</p>
-                  <p className="text-xs text-ink-muted mt-2">
-                    Create a job order from confirmed booking handoff or load a known job-order id.
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="ops-panel">
