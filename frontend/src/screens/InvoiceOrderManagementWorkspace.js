@@ -142,14 +142,27 @@ function MetricCard({ icon: Icon, label, value, sub }) {
 
 function StatusBadge({ value }) {
   const normalizedValue = String(value ?? '').trim()
+  const normalizedKey = normalizedValue.toLowerCase()
   const cls =
-    normalizedValue.includes('paid') || normalizedValue.includes('fulfilled') || normalizedValue === 'finalized'
-      ? 'badge-green'
-      : normalizedValue.includes('overdue') || normalizedValue.includes('blocked')
+    normalizedKey.includes('overdue') ||
+    normalizedKey.includes('blocked') ||
+    normalizedKey.includes('failed') ||
+    normalizedKey.includes('cancelled') ||
+    normalizedKey.includes('canceled')
         ? 'badge-red'
-        : normalizedValue.includes('pending') || normalizedValue.includes('partial')
+        : normalizedKey.includes('unpaid') ||
+            normalizedKey.includes('pending') ||
+            normalizedKey.includes('partial') ||
+            normalizedKey.includes('due') ||
+            normalizedKey.includes('processing')
           ? 'badge-orange'
-          : 'badge-gray'
+          : normalizedKey.includes('paid') ||
+              normalizedKey.includes('fulfilled') ||
+              normalizedKey === 'finalized' ||
+              normalizedKey.includes('settled') ||
+              normalizedKey.includes('completed')
+            ? 'badge-green'
+            : 'badge-gray'
 
   return <span className={`badge ${cls}`}>{formatLabel(normalizedValue, 'Unknown')}</span>
 }
@@ -395,22 +408,31 @@ export default function InvoiceOrderManagementWorkspace() {
   const ecommerceLoadLabel = LOAD_STATE_LABELS[ecommerceState.status] ?? 'Order Lookup'
   const jobOrderLoadLabel = LOAD_STATE_LABELS[jobOrderState.status] ?? 'Service Invoice Lookup'
   const agingLoadLabel = LOAD_STATE_LABELS[agingState.status] ?? 'Invoice Aging'
-  const lookupStateValue =
-    jobOrderState.status === 'invoice_order_loading' || ecommerceState.status === 'invoice_order_loading'
-      ? 'Syncing'
-      : jobOrderState.jobOrder || ecommerceOrder
-        ? 'Loaded'
-        : 'Awaiting'
-  const paymentStateValue = serviceInvoice?.paymentStatus
+  const serviceInvoiceSummaryValue =
+    jobOrderState.status === 'invoice_order_loading'
+      ? 'Loading Service Record'
+      : serviceInvoice
+        ? 'Invoice Ready'
+        : jobOrderState.jobOrder
+          ? 'No Invoice Record'
+          : 'Awaiting Lookup'
+  const servicePaymentStateValue = serviceInvoice?.paymentStatus
     ? formatLabel(serviceInvoice.paymentStatus)
-    : ecommerceInvoice?.status
-      ? formatLabel(ecommerceInvoice.status)
-      : 'Awaiting Detail'
-  const fulfillmentStateValue = ecommerceOrder?.status
-    ? formatLabel(ecommerceOrder.status)
-    : jobOrderState.jobOrder?.status
-      ? formatLabel(jobOrderState.jobOrder.status)
-      : 'Awaiting Detail'
+    : serviceInvoice
+      ? 'Unrecorded'
+      : 'Awaiting Service Invoice'
+  const ecommerceOrderStateValue =
+    ecommerceState.status === 'invoice_order_loading'
+      ? 'Loading Order'
+      : ecommerceOrder?.status
+        ? formatLabel(ecommerceOrder.status)
+        : ecommerceState.status === 'invoice_order_partial'
+          ? 'Invoice Pending'
+          : ecommerceState.status === 'invoice_order_runtime_unavailable'
+            ? 'Runtime Offline'
+            : ecommerceState.status === 'invoice_order_failed'
+              ? 'Load Failed'
+              : 'Awaiting Order'
 
   if (!user?.accessToken) {
     return (
@@ -514,9 +536,9 @@ export default function InvoiceOrderManagementWorkspace() {
       <section className="ops-summary-grid">
         <MetricCard
           icon={Database}
-          label="Lookup State"
-          value={lookupStateValue}
-          sub={`Service: ${jobOrderLoadLabel} • Orders: ${ecommerceLoadLabel}`}
+          label="Service Invoice State"
+          value={serviceInvoiceSummaryValue}
+          sub={serviceInvoice ? serviceInvoice.invoiceReference : `Service: ${jobOrderLoadLabel}`}
         />
         <MetricCard
           icon={BarChart3}
@@ -526,26 +548,22 @@ export default function InvoiceOrderManagementWorkspace() {
         />
         <MetricCard
           icon={ReceiptText}
-          label="Payment State"
-          value={paymentStateValue}
+          label="Service Payment State"
+          value={servicePaymentStateValue}
           sub={
             serviceInvoice
-              ? serviceInvoice.invoiceReference
-              : ecommerceInvoice
-                ? `${paymentEntries.length} payment entr${paymentEntries.length === 1 ? 'y' : 'ies'} tracked`
-                : 'Payment entries stay in owner workflows.'
+              ? `${formatInvoiceOrderCurrency(serviceInvoice.amountPaidCents)} recorded on ${formatDateTime(serviceInvoice.paidAt)}`
+              : 'Service payment stays in the Job Order Workbench.'
           }
         />
         <MetricCard
           icon={PackageCheck}
-          label="Fulfillment State"
-          value={fulfillmentStateValue}
+          label="Ecommerce Order State"
+          value={ecommerceOrderStateValue}
           sub={
             ecommerceOrder
               ? ecommerceOrder.orderNumber
-              : jobOrderState.jobOrder
-                ? `JO-${shortId(jobOrderState.jobOrder.id)}`
-                : 'Load a job order or order id to inspect live detail.'
+              : `Orders: ${ecommerceLoadLabel}`
           }
         />
       </section>
@@ -574,18 +592,6 @@ export default function InvoiceOrderManagementWorkspace() {
                 <p className="text-sm font-bold text-ink-primary">Payment-state boundary</p>
                 <p className="mt-2 text-sm leading-6 text-ink-muted">{staffInvoiceOrderPaymentCopy}</p>
               </div>
-
-              {jobOrderState.message ? (
-                <div className={`rounded-xl border px-4 py-3 text-xs ${getLoadMessageToneClass(jobOrderState.status)}`}>
-                  {jobOrderState.message}
-                </div>
-              ) : null}
-
-              {ecommerceState.message ? (
-                <div className={`rounded-xl border px-4 py-3 text-xs ${getLoadMessageToneClass(ecommerceState.status)}`}>
-                  {ecommerceState.message}
-                </div>
-              ) : null}
 
               {agingState.message ? (
                 <div className={`rounded-xl border px-4 py-3 text-xs ${getLoadMessageToneClass(agingState.status)}`}>
@@ -677,6 +683,12 @@ export default function InvoiceOrderManagementWorkspace() {
               <span className="badge badge-gray">{jobOrderLoadLabel}</span>
             </div>
 
+            {jobOrderState.message ? (
+              <div className={`mt-4 rounded-xl border px-4 py-3 text-xs ${getLoadMessageToneClass(jobOrderState.status)}`}>
+                {jobOrderState.message}
+              </div>
+            ) : null}
+
             {jobOrderState.jobOrder ? (
               <div className="mt-4 space-y-4">
                 <div className="grid gap-3 md:grid-cols-3">
@@ -745,6 +757,12 @@ export default function InvoiceOrderManagementWorkspace() {
               <span className="badge badge-gray">{ecommerceLoadLabel}</span>
             </div>
 
+            {ecommerceState.message ? (
+              <div className={`mt-4 rounded-xl border px-4 py-3 text-xs ${getLoadMessageToneClass(ecommerceState.status)}`}>
+                {ecommerceState.message}
+              </div>
+            ) : null}
+
             {ecommerceOrder ? (
               <div className="mt-4 space-y-4">
                 <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
@@ -812,12 +830,12 @@ export default function InvoiceOrderManagementWorkspace() {
             <div>
               <p className="card-title">Payment Entries</p>
               <p className="mt-1 text-sm leading-6 text-ink-muted">
-                Keep recorded payment entries visible here while preserving the owner systems that actually create
-                or settle those records.
+                Review ecommerce invoice payment-entry history here while service payment remains summarized
+                separately in the service billing surface.
               </p>
             </div>
             <span className="badge badge-gray">
-              {ecommerceInvoice ? `${paymentEntries.length} tracked` : 'Awaiting invoice detail'}
+              {ecommerceInvoice ? `${paymentEntries.length} ecommerce entr${paymentEntries.length === 1 ? 'y' : 'ies'}` : 'Ecommerce invoice only'}
             </span>
           </div>
 
@@ -889,3 +907,4 @@ export default function InvoiceOrderManagementWorkspace() {
     </div>
   )
 }
+
