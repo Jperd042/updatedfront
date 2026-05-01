@@ -50,6 +50,24 @@ export class JobOrdersController {
     return this.jobOrdersService.create(payload, request.user as { userId: string; role: string });
   }
 
+  @Get('assigned')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('technician')
+  @ApiOperation({ summary: 'List job orders assigned to the current technician.' })
+  @ApiBearerAuth('access-token')
+  @ApiOkResponse({
+    description: 'Job orders assigned to the current technician, most recently updated first.',
+    type: JobOrderResponseDto,
+    isArray: true,
+  })
+  @ApiForbiddenResponse({ description: 'Only technicians can list their assigned job orders.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token.' })
+  listAssigned(@Req() request: Request) {
+    return this.jobOrdersService.listAssignedToTechnician(
+      request.user as { userId: string; role: string },
+    );
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('technician', 'service_adviser', 'super_admin')

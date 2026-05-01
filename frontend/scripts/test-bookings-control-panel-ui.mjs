@@ -45,6 +45,14 @@ if (!content.includes('<BookingsCalendarView')) {
   failures.push('BookingsList.js must continue rendering BookingsCalendarView')
 }
 
+if (!content.includes("if (tab !== 'calendar')")) {
+  failures.push('BookingsList.js must only load calendar data when the calendar tab is active')
+}
+
+if (!content.includes("if (tab === 'calendar')") || !content.includes('refreshTasks.push(loadCalendarMonth(calendarMonth))')) {
+  failures.push('BookingsList.js refresh flow must only reload month data when the calendar view is active')
+}
+
 if (!content.includes('label="Current Queue"')) {
   failures.push('BookingsList.js must continue rendering the queue summary tile')
 }

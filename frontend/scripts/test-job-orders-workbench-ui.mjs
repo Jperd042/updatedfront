@@ -33,6 +33,18 @@ if (!file.includes('onClick={handleLoadJobOrder}')) {
   failures.push('JobOrderWorkbench should wire the manual lookup action to handleLoadJobOrder')
 }
 
+for (const removedSnippet of [
+  'Refresh Handoffs',
+  'Confirmed handoff',
+  'Workshop execution',
+  'QA-ready finish',
+  'Invoice follow-up',
+]) {
+  if (file.includes(removedSnippet)) {
+    failures.push(`JobOrderWorkbench should not render deprecated control-strip copy: ${removedSnippet}`)
+  }
+}
+
 const handleLoadJobOrderStart = file.indexOf('const handleLoadJobOrder = async () => {')
 const handleLoadJobOrderEnd = file.indexOf('const handleCreateJobOrder = async () => {')
 const handleLoadJobOrderBlock =

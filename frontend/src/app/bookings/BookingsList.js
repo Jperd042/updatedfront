@@ -87,14 +87,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'confirmed',
       label: 'Accept Booking',
       icon: CheckCircle2,
-      className: 'btn-primary min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
+      className: 'booking-status-action-primary',
       reason: 'Accepted by staff from admin appointments.',
     },
     {
       status: 'declined',
       label: 'Decline',
       icon: XCircle,
-      className: 'btn-ghost min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
+      className: 'booking-status-action-secondary',
       reason: 'Declined by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to decline this booking?',
@@ -104,7 +104,7 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
+      className: 'booking-status-action-danger',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -116,14 +116,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'completed',
       label: 'Mark Complete',
       icon: CheckCircle2,
-      className: 'btn-primary min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
+      className: 'booking-status-action-primary',
       reason: 'Completed by staff from admin appointments.',
     },
     {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
+      className: 'booking-status-action-danger',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -135,14 +135,14 @@ const STAFF_ACTIONS_BY_STATUS = {
       status: 'confirmed',
       label: 'Accept New Slot',
       icon: CheckCircle2,
-      className: 'btn-primary min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
+      className: 'booking-status-action-primary',
       reason: 'Accepted rescheduled slot from admin appointments.',
     },
     {
       status: 'cancelled',
       label: 'Cancel',
       icon: XCircle,
-      className: 'btn-danger min-h-10 w-full justify-center px-4 text-sm sm:w-auto sm:min-w-[152px]',
+      className: 'booking-status-action-danger',
       reason: 'Cancelled by staff from admin appointments.',
       requiresConfirmation: true,
       confirmMessage: 'Are you sure you want to cancel this booking?',
@@ -501,7 +501,7 @@ function SlotDefinitionsPanel({
         {error ? <span className="badge badge-orange">Using last loaded definitions</span> : null}
       </div>
 
-      <form onSubmit={onCreate} className="grid md:grid-cols-5 gap-2 mt-4 rounded-xl border border-surface-border bg-surface-raised p-3">
+      <form onSubmit={onCreate} className="booking-slot-create-form">
         <label className="text-xs text-ink-muted md:col-span-2">
           New slot label
           <input
@@ -543,14 +543,14 @@ function SlotDefinitionsPanel({
         <button
           type="submit"
           disabled={mutationState.status === 'submitting'}
-          className="btn-primary md:col-span-5 justify-center"
+          className="booking-slot-create-action"
         >
           {mutationState.status === 'submitting' && mutationState.target === 'create' ? (
             <RefreshCw size={14} className="animate-spin" />
           ) : (
             <Clock size={14} />
           )}
-          Add Slot Definition
+          Add Slot
         </button>
       </form>
 
@@ -1453,8 +1453,12 @@ export default function BookingsList() {
   }, [calendarMonth, canReadBookingOperations, statusFilter, timeSlotFilter, user?.accessToken])
 
   useEffect(() => {
+    if (tab !== 'calendar') {
+      return
+    }
+
     void loadCalendarMonth(calendarMonth)
-  }, [calendarMonth, loadCalendarMonth])
+  }, [calendarMonth, loadCalendarMonth, tab])
 
   async function refreshBookingOperations() {
     setActionState((previous) => ({
@@ -1462,12 +1466,17 @@ export default function BookingsList() {
       message: '',
     }))
 
-    await Promise.allSettled([
+    const refreshTasks = [
       loadSlotDefinitions(),
       loadStaffBookingReads(),
       loadUpcomingScheduleWindow(selectedDateRef.current),
-      loadCalendarMonth(calendarMonth),
-    ])
+    ]
+
+    if (tab === 'calendar') {
+      refreshTasks.push(loadCalendarMonth(calendarMonth))
+    }
+
+    await Promise.allSettled(refreshTasks)
   }
 
   function openJobOrderFromBooking(booking, overrideJobOrderId) {
@@ -1572,7 +1581,7 @@ export default function BookingsList() {
 
   const scheduleSummary = useMemo(() => summarizeSchedule(scheduleState.data), [scheduleState.data])
   const bookedScheduleDates = useMemo(
-    () => scheduleWindowState.dates.filter((date) => date.totalBookings > 0),
+    () => scheduleWindowState.dates.filter((date) => date.pendingCount > 0),
     [scheduleWindowState.dates],
   )
   const calendarBookingsByDate = useMemo(
@@ -1617,6 +1626,8 @@ export default function BookingsList() {
   const isLoadingSchedule = scheduleState.status === 'loading' && !hasScheduleData
   const isLoadingQueue = queueState.status === 'loading' && !hasQueueData
   const isLoadingCalendar = calendarState.status === 'loading' && calendarState.dates.length === 0
+  const isRefreshingOperations =
+    scheduleState.status === 'loading' || queueState.status === 'loading' || (tab === 'calendar' && calendarState.status === 'loading')
 
   return (
     <div className="booking-page-shell">
@@ -1631,10 +1642,10 @@ export default function BookingsList() {
         </div>
         <button
           onClick={refreshBookingOperations}
-          disabled={scheduleState.status === 'loading' || queueState.status === 'loading'}
+          disabled={isRefreshingOperations}
           className="btn-ghost min-h-11 min-w-[148px] self-start xl:self-auto"
         >
-          <RefreshCw size={14} className={scheduleState.status === 'loading' ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={isRefreshingOperations ? 'animate-spin' : ''} />
           Refresh
         </button>
       </section>

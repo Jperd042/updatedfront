@@ -85,6 +85,8 @@ export const customerMobileGuardMessages = {
 
 export const isCustomerMobileRole = (role) => !role || role === 'customer';
 
+export const isTechnicianMobileRole = (role) => role === 'technician';
+
 export const getCustomerMobileSessionAccessState = (account) => {
   if (!account?.accessToken || !account?.userId) {
     return 'unauthorized_session';
@@ -100,6 +102,12 @@ export const getCustomerMobileSessionAccessState = (account) => {
 
   return 'customer_session_active';
 };
+
+export const isTechnicianMobileSessionActive = (account) =>
+  Boolean(account?.accessToken) &&
+  Boolean(account?.userId) &&
+  isTechnicianMobileRole(account?.role) &&
+  account?.isActive !== false;
 
 const buildAuthorizedHeaders = (accessToken) =>
   accessToken

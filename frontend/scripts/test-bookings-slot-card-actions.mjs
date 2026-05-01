@@ -29,6 +29,9 @@ const requiredCssSnippets = [
   '.booking-slot-action-primary',
   '.booking-slot-action-secondary',
   '.booking-slot-action-danger',
+  '.booking-status-action-primary',
+  '.booking-status-action-secondary',
+  '.booking-status-action-danger',
 ]
 
 for (const snippet of requiredCssSnippets) {
@@ -37,12 +40,12 @@ for (const snippet of requiredCssSnippets) {
   }
 }
 
-if (!content.includes("className: 'btn-primary")) {
-  failures.push('BookingsList.js should still preserve the primary booking status action hierarchy')
+if (!content.includes("className: 'booking-status-action-primary")) {
+  failures.push('BookingsList.js should preserve the shared primary booking status action hierarchy')
 }
 
-if (!content.includes("className: 'btn-danger")) {
-  failures.push('BookingsList.js should still preserve destructive booking actions')
+if (!content.includes("className: 'booking-status-action-danger")) {
+  failures.push('BookingsList.js should preserve the shared destructive booking action hierarchy')
 }
 
 if (failures.length > 0) {

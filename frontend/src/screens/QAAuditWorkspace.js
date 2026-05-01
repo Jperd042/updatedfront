@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertTriangle,
@@ -26,7 +26,6 @@ import {
   getLatestQualityGateOverride,
   getQualityGateReleaseState,
   getReviewNeededQualityGateFindings,
-  qualityGateReviewContractSources,
 } from '@/lib/api/generated/quality-gates/staff-web-qa-review'
 
 const initialQaState = {
@@ -476,17 +475,16 @@ function OverrideAuditPanel({
   )
 }
 
-function ContractSourcesPanel({ sourceCount }) {
+function ContractSourcesPanel() {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div>
         <div>
           <p className="card-title">Contract Sources / Linked Context</p>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">
             QA Audit is a live review and override surface. It does not create inspections, job orders, or fake audit queues.
           </p>
         </div>
-        <span className="badge badge-gray">{sourceCount} source references</span>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-2xl border border-surface-border bg-surface-card p-4">
@@ -507,13 +505,6 @@ function ContractSourcesPanel({ sourceCount }) {
             Continue in Job Orders <ExternalLink size={14} />
           </Link>
         </div>
-      </div>
-      <div className="grid gap-3 xl:grid-cols-2">
-        {qualityGateReviewContractSources.map((source) => (
-          <div key={source} className="rounded-2xl border border-surface-border bg-surface-card p-4">
-            <p className="break-all text-sm font-semibold text-ink-primary">{source}</p>
-          </div>
-        ))}
       </div>
     </div>
   )
@@ -545,7 +536,6 @@ export default function QAAuditWorkspace() {
 
   const selectedReleaseState = getQualityGateReleaseState(qualityGate)
   const releaseSummary = releaseSummaryByState[selectedReleaseState] ?? releaseSummaryByState.release_unavailable
-  const sourceCount = useMemo(() => qualityGateReviewContractSources.length, [])
   const blockingFindings = qualityGate ? getBlockingQualityGateFindings(qualityGate) : []
 
   async function loadQualityGate() {
@@ -823,7 +813,7 @@ export default function QAAuditWorkspace() {
           </div>
         </div>
         <div className="ops-panel">
-          <ContractSourcesPanel sourceCount={sourceCount} />
+          <ContractSourcesPanel />
         </div>
       </section>
     </div>

@@ -43,7 +43,7 @@ const LOAD_STATE_LABELS = {
   invoice_order_forbidden_role: 'Role Blocked',
   invoice_order_unauthorized: 'Sign-In Required',
   invoice_order_runtime_unavailable: 'Runtime Unavailable',
-  invoice_order_failed: 'Load Failed',
+  invoice_order_failed: 'Unavailable',
 }
 
 const formatDateTime = (value) => {
@@ -431,7 +431,7 @@ export default function InvoiceOrderManagementWorkspace() {
           : ecommerceState.status === 'invoice_order_runtime_unavailable'
             ? 'Runtime Offline'
             : ecommerceState.status === 'invoice_order_failed'
-              ? 'Load Failed'
+              ? 'Unavailable'
               : 'Awaiting Order'
 
   if (!user?.accessToken) {
@@ -525,12 +525,6 @@ export default function InvoiceOrderManagementWorkspace() {
             Load Order
           </button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="badge badge-green">Live service invoice lookup</span>
-          <span className="badge badge-blue">Known-order ecommerce lookup</span>
-          <span className="badge badge-orange">Read-only aging analytics</span>
-          <span className="badge badge-gray">Payment ownership stays routed</span>
-        </div>
       </section>
 
       <section className="ops-summary-grid">
@@ -578,12 +572,7 @@ export default function InvoiceOrderManagementWorkspace() {
                 specific billing record.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="badge badge-gray">{agingLoadLabel}</span>
-              <Link href="/admin/summaries" className="badge badge-blue">
-                Open analytics hub
-              </Link>
-            </div>
+            <span className="badge badge-gray">{agingLoadLabel}</span>
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">

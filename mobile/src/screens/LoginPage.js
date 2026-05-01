@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AuthFrame from '../components/AuthFrame';
 import FormField from '../components/FormField';
@@ -77,12 +77,12 @@ export default function LoginPage({ navigation, route, onLogin }) {
     <AuthFrame
       title="Welcome back"
       subtitle="Sign in with your email and password. OTP is only required when creating a new account."
-      backLabel="Back to Home"
+      backLabel="Back to home"
       onBack={() => navigation.replace('Landing')}
       centerContent
     >
       <FormField
-        label="Email Address"
+        label="Email address"
         value={form.email}
         onChangeText={(value) => handleFieldChange('email', value)}
         placeholder="you@email.com"
@@ -127,7 +127,7 @@ export default function LoginPage({ navigation, route, onLogin }) {
       <TouchableOpacity
         style={[styles.primaryButton, submitting && styles.primaryButtonDisabled]}
         onPress={handleLogin}
-        activeOpacity={0.88}
+        activeOpacity={0.9}
         disabled={submitting}
       >
         <View style={styles.primaryButtonContent}>
@@ -135,8 +135,8 @@ export default function LoginPage({ navigation, route, onLogin }) {
             <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
             <>
-              <Text style={styles.primaryButtonText}>Sign In</Text>
-              <MaterialCommunityIcons name="arrow-right" size={18} color={colors.onPrimary} />
+              <Text style={styles.primaryButtonText}>Sign in</Text>
+              <Feather name="arrow-right" size={16} color={colors.onPrimary} />
             </>
           )}
         </View>
@@ -145,7 +145,7 @@ export default function LoginPage({ navigation, route, onLogin }) {
       <View style={styles.footerRow}>
         <Text style={styles.footerText}>Don't have an account? </Text>
         <Text style={styles.footerLink} onPress={() => navigation.replace('Register')}>
-          Sign Up
+          Sign up
         </Text>
       </View>
     </AuthFrame>
@@ -156,38 +156,33 @@ const styles = StyleSheet.create({
   forgotPasswordLink: {
     alignSelf: 'flex-end',
     marginTop: -2,
-    marginBottom: 22,
+    marginBottom: 18,
   },
   forgotPasswordText: {
     color: colors.primary,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
   primaryButton: {
     backgroundColor: colors.primary,
-    borderRadius: radius.medium,
-    paddingVertical: 18,
+    borderRadius: radius.md,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.34,
-    shadowRadius: 24,
-    elevation: 5,
   },
   primaryButtonDisabled: {
-    opacity: 0.72,
+    opacity: 0.7,
   },
   primaryButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
   },
   primaryButtonText: {
     color: colors.onPrimary,
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
   },
   footerRow: {
     marginTop: 22,
@@ -197,11 +192,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     color: colors.mutedText,
-    fontSize: 15,
+    fontSize: 14,
   },
   footerLink: {
     color: colors.primary,
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

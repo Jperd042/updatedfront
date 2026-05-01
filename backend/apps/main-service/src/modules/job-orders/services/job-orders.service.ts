@@ -83,6 +83,16 @@ export class JobOrdersService {
     return createdJobOrder;
   }
 
+  async listAssignedToTechnician(actor: JobOrderActor) {
+    const resolvedActor = await this.assertStaffActor(actor.userId);
+
+    if (resolvedActor.role !== 'technician') {
+      throw new ForbiddenException('Only technicians can list their assigned job orders');
+    }
+
+    return this.jobOrdersRepository.findAssignedToTechnician(resolvedActor.id);
+  }
+
   async findById(id: string, actor: JobOrderActor) {
     const resolvedActor = await this.assertStaffActor(actor.userId);
     const jobOrder = await this.jobOrdersRepository.findById(id);
