@@ -10729,7 +10729,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 5,
+    padding: 4,
     marginBottom: 16,
     gap: 4,
   },
@@ -10738,7 +10738,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTab: {
-    flex: 1,
     minHeight: 40,
     borderRadius: 10,
     flexDirection: 'row',
@@ -10750,11 +10749,6 @@ const styles = StyleSheet.create({
   },
   sectionTabActive: {
     backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 3,
   },
   sectionTabText: {
     color: colors.mutedText,
