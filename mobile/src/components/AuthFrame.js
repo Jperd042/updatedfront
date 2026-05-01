@@ -78,11 +78,18 @@ export default function AuthFrame({
     >
       <Animated.View style={cardWrapStyle}>
         <View style={[styles.card, isCompactLayout && styles.cardCompact, cardStyle]}>
-          {backLabel && onBack ? (
-            <TouchableOpacity style={styles.backLink} onPress={onBack} activeOpacity={0.7}>
-              <Feather name="arrow-left" size={16} color={colors.mutedText} />
-              <Text style={styles.backLinkText}>{backLabel}</Text>
-            </TouchableOpacity>
+          {onBack ? (
+            <View style={styles.backRow}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={onBack}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel={backLabel || 'Go back'}
+              >
+                <Feather name="arrow-left" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
           ) : null}
 
           <View style={styles.heroBlock}>
@@ -170,17 +177,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: 'transparent',
   },
-  backLink: {
+  backRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 24,
-    paddingTop: 22,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  backLinkText: {
-    color: colors.mutedText,
-    fontSize: 13,
-    fontWeight: '600',
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroBlock: {
     paddingHorizontal: 24,
