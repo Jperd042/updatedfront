@@ -2052,6 +2052,7 @@ export default function Dashboard({
   const [storeOrderTrackingState, setStoreOrderTrackingState] = useState(
     createInitialStoreOrderTrackingState,
   );
+  const [isStoreOrderDetailVisible, setIsStoreOrderDetailVisible] = useState(false);
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
   const [isProfileTooltipVisible, setIsProfileTooltipVisible] = useState(false);
   const [timelineFilter, setTimelineFilter] = useState('All');
@@ -3320,6 +3321,7 @@ export default function Dashboard({
     activeStoreOrderRequestRef.current = order.id;
     setSelectedStoreOrderId(order.id);
     setStoreOrderTrackingState(buildStoreOrderSelectionState(order));
+    setIsStoreOrderDetailVisible(true);
   };
 
   const handleOpenStoreOrders = (order = null) => {
@@ -3330,7 +3332,12 @@ export default function Dashboard({
       activeStoreOrderRequestRef.current = order.id;
       setSelectedStoreOrderId(order.id);
       setStoreOrderTrackingState(buildStoreOrderSelectionState(order));
+      setIsStoreOrderDetailVisible(true);
     }
+  };
+
+  const handleCloseStoreOrderDetail = () => {
+    setIsStoreOrderDetailVisible(false);
   };
 
   const handleRefreshStoreOrders = async () => {
@@ -3393,6 +3400,15 @@ export default function Dashboard({
     }
   };
 
+  const handleContinueToBilling = () => {
+    setCheckoutState((currentState) => ({
+      ...currentState,
+      stage: 'billing',
+      errorMessage: '',
+      fieldErrors: {},
+    }));
+  };
+
   const handleSubmitInvoiceCheckout = async () => {
     if (!account?.userId || checkoutState.submitting) {
       return;
@@ -3403,7 +3419,7 @@ export default function Dashboard({
     if (Object.keys(fieldErrors).length > 0) {
       setCheckoutState((currentState) => ({
         ...currentState,
-        stage: 'preview',
+        stage: 'billing',
         previewStatus: currentState.previewStatus === 'ready' ? 'ready' : currentState.previewStatus,
         fieldErrors,
         errorMessage: 'Complete the billing address details before creating the invoice checkout.',
@@ -3461,7 +3477,7 @@ export default function Dashboard({
 
       setCheckoutState((currentState) => ({
         ...currentState,
-        stage: 'preview',
+        stage: 'billing',
         previewStatus: currentState.previewStatus === 'ready' ? 'ready' : currentState.previewStatus,
         submitting: false,
         errorMessage: nextMessage,
@@ -4840,11 +4856,6 @@ export default function Dashboard({
     ));
 
   const renderStoreContent = () => {
-    const selectedStoreOrder =
-      storeOrderTrackingState.order ||
-      storeOrderHistoryState.orders.find((order) => order.id === selectedStoreOrderId) ||
-      null;
-    const selectedStoreInvoice = storeOrderTrackingState.invoice;
     const isStoreRefreshBusy =
       storeOrderHistoryState.status === 'loading' ||
       storeOrderTrackingState.status === 'loading' ||
@@ -4863,7 +4874,12 @@ export default function Dashboard({
               key={item.key}
               item={item}
               isActive={storeSection === item.key}
-              onPress={() => setStoreSection(item.key)}
+              onPress={() => {
+                setStoreSection(item.key);
+                if (item.key !== 'orders') {
+                  setIsStoreOrderDetailVisible(false);
+                }
+              }}
             />
           ))}
         </View>
@@ -4884,31 +4900,11 @@ export default function Dashboard({
               void handleOpenProduct(product);
             }}
             onOpenCart={handleOpenCart}
+            onOpenOrders={() => setStoreSection('orders')}
             onRefresh={() => {
               void loadCatalogModuleState();
             }}
           />
-
-          <View style={styles.infoBlock}>
-            <Text style={styles.infoTitle}>Catalog and checkout</Text>
-            <Text style={styles.infoText}>
-              Browse available items, manage your cart, and review checkout totals from the customer shop.
-            </Text>
-          </View>
-
-          <View style={styles.infoBlock}>
-            <Text style={styles.infoTitle}>Need post-checkout tracking?</Text>
-            <Text style={styles.infoText}>
-              Open the Orders tab to review submitted shop orders and invoice updates.
-            </Text>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => setStoreSection('orders')}
-              activeOpacity={0.88}
-            >
-              <Text style={styles.secondaryButtonText}>Open Orders</Text>
-            </TouchableOpacity>
-          </View>
         </>
       ) : (
         <>
@@ -4916,7 +4912,7 @@ export default function Dashboard({
             <View style={styles.storeOrdersToolbarCopy}>
               <Text style={styles.bookingSectionLabel}>Order History</Text>
               <Text style={styles.storeOrdersToolbarText}>
-                Review submitted orders and invoice updates without changing your active cart.
+                Tap an order to open a focused tracking view with invoice and fulfillment detail.
               </Text>
             </View>
 
@@ -4985,6 +4981,27 @@ export default function Dashboard({
           ) : null}
 
           {storeOrderHistoryState.orders.length ? (
+            <View style={styles.storeOrderSummaryCard}>
+              <View style={styles.storeOrderSummaryHeader}>
+                <View style={styles.storeOrderSummaryCopy}>
+                  <Text style={styles.storeOrderSummaryValue}>{storeOrderHistoryState.orders.length}</Text>
+                  <Text style={styles.storeOrderSummaryLabel}>Tracked shop orders</Text>
+                </View>
+                <View style={styles.storeOrderSummaryBadge}>
+                  <Text style={styles.storeOrderSummaryBadgeText}>
+                    {selectedStoreOrder ? '1 selected' : 'Choose one'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.storeOrderSummaryText}>
+                {selectedStoreOrder
+                  ? `Selected ${selectedStoreOrder.orderNumber}. Open the card again anytime to review its latest order and invoice snapshot.`
+                  : 'Your latest invoice-backed orders appear here. The list stays compact so tracking is easier on mobile.'}
+              </Text>
+            </View>
+          ) : null}
+
+          {storeOrderHistoryState.orders.length ? (
             <View style={styles.storeOrderList}>
               {storeOrderHistoryState.orders.map((order) => (
                 <StoreOrderCard
@@ -5018,153 +5035,6 @@ export default function Dashboard({
                 {storeOrderTrackingState.errorMessage || 'We could not load the selected order right now.'}
               </Text>
             </View>
-          ) : null}
-
-          {selectedStoreOrder ? (
-            <>
-              <View style={styles.checkoutSummaryCard}>
-                <Text style={styles.checkoutSummaryTitle}>Selected Order</Text>
-                <View style={styles.checkoutSummaryRow}>
-                  <Text style={styles.checkoutSummaryLabel}>Order</Text>
-                  <Text style={styles.checkoutSummaryValue}>{selectedStoreOrder.orderNumber}</Text>
-                </View>
-                <View style={styles.checkoutSummaryRow}>
-                  <Text style={styles.checkoutSummaryLabel}>Created</Text>
-                  <Text style={styles.checkoutSummaryValue}>
-                    {formatStoreDateTimeLabel(selectedStoreOrder.createdAt)}
-                  </Text>
-                </View>
-                <View style={styles.checkoutSummaryRow}>
-                  <Text style={styles.checkoutSummaryLabel}>Status</Text>
-                  <Text style={styles.checkoutSummaryValue}>{selectedStoreOrder.statusLabel}</Text>
-                </View>
-                <View style={styles.checkoutSummaryRow}>
-                  <Text style={styles.checkoutSummaryLabel}>Subtotal</Text>
-                  <Text style={styles.checkoutSummaryValue}>{selectedStoreOrder.subtotalLabel}</Text>
-                </View>
-                <View style={styles.checkoutSummaryRow}>
-                  <Text style={styles.checkoutSummaryLabel}>Notes</Text>
-                    <Text style={styles.checkoutSummaryValue}>
-                      {selectedStoreOrder.notes || 'No checkout notes were attached.'}
-                    </Text>
-                </View>
-
-                <Text style={styles.checkoutSummaryNote}>{selectedStoreOrder.crossServiceHint}</Text>
-              </View>
-
-              <View style={styles.checkoutFormCard}>
-                <Text style={styles.checkoutCardTitle}>Invoice Tracking</Text>
-
-                {selectedStoreInvoice ? (
-                  <>
-                    <View style={styles.checkoutSummaryRow}>
-                      <Text style={styles.checkoutSummaryLabel}>Invoice</Text>
-                      <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.invoiceNumber}</Text>
-                    </View>
-                    <View style={styles.checkoutSummaryRow}>
-                      <Text style={styles.checkoutSummaryLabel}>Status</Text>
-                      <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.statusLabel}</Text>
-                    </View>
-                    <View style={styles.checkoutSummaryRow}>
-                      <Text style={styles.checkoutSummaryLabel}>Aging</Text>
-                      <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.agingBucketLabel}</Text>
-                    </View>
-                    <View style={styles.checkoutSummaryRow}>
-                      <Text style={styles.checkoutSummaryLabel}>Amount Due</Text>
-                      <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.amountDueLabel}</Text>
-                    </View>
-                    <View style={styles.checkoutSummaryRow}>
-                      <Text style={styles.checkoutSummaryLabel}>Amount Paid</Text>
-                      <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.amountPaidLabel}</Text>
-                    </View>
-                    <View style={styles.checkoutSummaryRow}>
-                      <Text style={styles.checkoutSummaryLabel}>Issued</Text>
-                      <Text style={styles.checkoutSummaryValue}>
-                        {formatStoreDateLabel(selectedStoreInvoice.issuedAt)}
-                      </Text>
-                    </View>
-                    <View style={styles.checkoutSummaryRow}>
-                      <Text style={styles.checkoutSummaryLabel}>Due</Text>
-                      <Text style={styles.checkoutSummaryValue}>
-                        {formatStoreDateLabel(selectedStoreInvoice.dueAt)}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.checkoutSummaryNote}>{selectedStoreInvoice.agingSummary}</Text>
-                    <Text style={styles.checkoutSummaryNote}>{selectedStoreInvoice.crossServiceHint}</Text>
-
-                    {selectedStoreInvoice.paymentEntries.length ? (
-                      <View style={styles.storePaymentEntryList}>
-                        {selectedStoreInvoice.paymentEntries.map((paymentEntry) => (
-                          <StorePaymentEntryRow key={paymentEntry.id} item={paymentEntry} />
-                        ))}
-                      </View>
-                    ) : (
-                      <Text style={styles.checkoutStateText}>
-                        No payment entries have been recorded yet. This screen only reflects manual backend
-                        records and never assumes gateway settlement.
-                      </Text>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.checkoutStateText}>
-                      {storeOrderTrackingState.invoiceErrorMessage ||
-                        'Invoice tracking has not been published for this order yet.'}
-                    </Text>
-                    {selectedStoreOrder.invoice ? (
-                      <Text style={styles.checkoutSummaryNote}>
-                        Summary invoice status: {selectedStoreOrder.invoice.invoiceNumber} -{' '}
-                        {selectedStoreOrder.invoice.statusLabel}
-                      </Text>
-                    ) : null}
-                    <Text style={styles.checkoutSummaryNote}>{selectedStoreOrder.crossServiceHint}</Text>
-                  </>
-                )}
-              </View>
-
-              <View style={styles.checkoutFormCard}>
-                <Text style={styles.checkoutCardTitle}>Billing Address Snapshot</Text>
-                <Text style={styles.checkoutAddressText}>
-                  {buildCheckoutAddressLabel(
-                    selectedStoreOrder.addresses?.find((address) => address.addressType === 'billing'),
-                  ) || 'No billing address was returned in the order snapshot.'}
-                </Text>
-              </View>
-
-              <View style={styles.checkoutFormCard}>
-                <Text style={styles.checkoutCardTitle}>Ordered Items</Text>
-                {selectedStoreOrder.items.map((item) => (
-                  <View key={item.id} style={styles.checkoutPreviewItem}>
-                    <View style={styles.checkoutPreviewItemCopy}>
-                      <Text style={styles.checkoutPreviewItemTitle}>{item.productName}</Text>
-                      <Text style={styles.checkoutPreviewItemMeta}>
-                        Qty {item.quantity}
-                        {item.productSku ? ` | SKU ${item.productSku}` : ''}
-                      </Text>
-                    </View>
-                    <Text style={styles.checkoutPreviewItemValue}>{item.lineTotalLabel}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.checkoutFormCard}>
-                <Text style={styles.checkoutCardTitle}>Order Status Timeline</Text>
-                {selectedStoreOrder.statusHistory.length ? (
-                  selectedStoreOrder.statusHistory.map((historyEntry, index) => (
-                    <StoreOrderHistoryEntry
-                      key={historyEntry.id}
-                      item={historyEntry}
-                      isLast={index === selectedStoreOrder.statusHistory.length - 1}
-                    />
-                  ))
-                ) : (
-                  <Text style={styles.checkoutStateText}>
-                    No order status transitions have been recorded beyond the initial checkout yet.
-                  </Text>
-                )}
-              </View>
-            </>
           ) : null}
         </>
       )}
@@ -6740,6 +6610,11 @@ export default function Dashboard({
   const cartCount = cartState.totalQuantity;
   const cartTotalLabel = cartState.subtotalLabel;
   const checkoutPreviewItems = checkoutState.preview?.items ?? [];
+  const selectedStoreOrder =
+    storeOrderTrackingState.order ||
+    storeOrderHistoryState.orders.find((order) => order.id === selectedStoreOrderId) ||
+    null;
+  const selectedStoreInvoice = storeOrderTrackingState.invoice;
   const isCatalogDetailVisible = catalogDetailState.status !== 'idle';
   const selectedCatalogProduct = catalogDetailState.product ?? catalogDetailState.previewProduct;
   const unreadNotificationCount = notificationsFeed.filter((item) => item.unread).length;
@@ -7029,6 +6904,202 @@ export default function Dashboard({
             </Animated.View>
           ) : null}
 
+          {isStoreOrderDetailVisible && selectedStoreOrder ? (
+            <Animated.View
+              style={[
+                styles.cartOverlay,
+                {
+                  opacity: 1,
+                },
+              ]}
+            >
+              <View style={styles.cartHeader}>
+                <TouchableOpacity
+                  style={styles.cartCloseButton}
+                  onPress={handleCloseStoreOrderDetail}
+                  activeOpacity={0.86}
+                >
+                  <MaterialCommunityIcons name="arrow-left" size={22} color={colors.mutedText} />
+                </TouchableOpacity>
+
+                <View style={styles.cartHeaderCopy}>
+                  <Text style={styles.cartTitle}>Order Detail</Text>
+                  <Text style={styles.cartSubtitle}>{selectedStoreOrder.orderNumber}</Text>
+                </View>
+              </View>
+
+              <ScrollView
+                style={styles.cartItemsScroll}
+                contentContainerStyle={styles.cartItemsContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {(storeOrderTrackingState.status === 'loading' ||
+                  storeOrderTrackingState.invoiceStatus === 'loading') ? (
+                  <View style={styles.checkoutStateCard}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.checkoutStateTitle}>Refreshing order tracking</Text>
+                    <Text style={styles.checkoutStateText}>
+                      Pulling the selected order snapshot and invoice tracking detail now.
+                    </Text>
+                  </View>
+                ) : null}
+
+                {(storeOrderTrackingState.status === 'error' ||
+                  storeOrderTrackingState.status === 'unauthorized') ? (
+                  <View style={styles.checkoutStateCard}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={28} color="#FF8B8B" />
+                    <Text style={styles.checkoutStateTitle}>Tracking unavailable</Text>
+                    <Text style={styles.checkoutStateText}>
+                      {storeOrderTrackingState.errorMessage || 'We could not load the selected order right now.'}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.checkoutSummaryCard}>
+                  <Text style={styles.checkoutSummaryTitle}>Order Summary</Text>
+                  <View style={styles.checkoutSummaryRow}>
+                    <Text style={styles.checkoutSummaryLabel}>Order</Text>
+                    <Text style={styles.checkoutSummaryValue}>{selectedStoreOrder.orderNumber}</Text>
+                  </View>
+                  <View style={styles.checkoutSummaryRow}>
+                    <Text style={styles.checkoutSummaryLabel}>Created</Text>
+                    <Text style={styles.checkoutSummaryValue}>
+                      {formatStoreDateTimeLabel(selectedStoreOrder.createdAt)}
+                    </Text>
+                  </View>
+                  <View style={styles.checkoutSummaryRow}>
+                    <Text style={styles.checkoutSummaryLabel}>Status</Text>
+                    <Text style={styles.checkoutSummaryValue}>{selectedStoreOrder.statusLabel}</Text>
+                  </View>
+                  <View style={styles.checkoutSummaryRow}>
+                    <Text style={styles.checkoutSummaryLabel}>Subtotal</Text>
+                    <Text style={styles.checkoutSummaryValue}>{selectedStoreOrder.subtotalLabel}</Text>
+                  </View>
+                  <View style={styles.checkoutSummaryRow}>
+                    <Text style={styles.checkoutSummaryLabel}>Notes</Text>
+                    <Text style={styles.checkoutSummaryValue}>
+                      {selectedStoreOrder.notes || 'No checkout notes were attached.'}
+                    </Text>
+                  </View>
+                  <Text style={styles.checkoutSummaryNote}>{selectedStoreOrder.crossServiceHint}</Text>
+                </View>
+
+                <View style={styles.checkoutFormCard}>
+                  <Text style={styles.checkoutCardTitle}>Invoice Tracking</Text>
+
+                  {selectedStoreInvoice ? (
+                    <>
+                      <View style={styles.checkoutSummaryRow}>
+                        <Text style={styles.checkoutSummaryLabel}>Invoice</Text>
+                        <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.invoiceNumber}</Text>
+                      </View>
+                      <View style={styles.checkoutSummaryRow}>
+                        <Text style={styles.checkoutSummaryLabel}>Status</Text>
+                        <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.statusLabel}</Text>
+                      </View>
+                      <View style={styles.checkoutSummaryRow}>
+                        <Text style={styles.checkoutSummaryLabel}>Aging</Text>
+                        <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.agingBucketLabel}</Text>
+                      </View>
+                      <View style={styles.checkoutSummaryRow}>
+                        <Text style={styles.checkoutSummaryLabel}>Amount Due</Text>
+                        <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.amountDueLabel}</Text>
+                      </View>
+                      <View style={styles.checkoutSummaryRow}>
+                        <Text style={styles.checkoutSummaryLabel}>Amount Paid</Text>
+                        <Text style={styles.checkoutSummaryValue}>{selectedStoreInvoice.amountPaidLabel}</Text>
+                      </View>
+                      <View style={styles.checkoutSummaryRow}>
+                        <Text style={styles.checkoutSummaryLabel}>Issued</Text>
+                        <Text style={styles.checkoutSummaryValue}>
+                          {formatStoreDateLabel(selectedStoreInvoice.issuedAt)}
+                        </Text>
+                      </View>
+                      <View style={styles.checkoutSummaryRow}>
+                        <Text style={styles.checkoutSummaryLabel}>Due</Text>
+                        <Text style={styles.checkoutSummaryValue}>
+                          {formatStoreDateLabel(selectedStoreInvoice.dueAt)}
+                        </Text>
+                      </View>
+
+                      <Text style={styles.checkoutSummaryNote}>{selectedStoreInvoice.agingSummary}</Text>
+                      <Text style={styles.checkoutSummaryNote}>{selectedStoreInvoice.crossServiceHint}</Text>
+
+                      {selectedStoreInvoice.paymentEntries.length ? (
+                        <View style={styles.storePaymentEntryList}>
+                          {selectedStoreInvoice.paymentEntries.map((paymentEntry) => (
+                            <StorePaymentEntryRow key={paymentEntry.id} item={paymentEntry} />
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={styles.checkoutStateText}>
+                          No payment entries have been recorded yet. This screen only reflects manual backend
+                          records and never assumes gateway settlement.
+                        </Text>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.checkoutStateText}>
+                        {storeOrderTrackingState.invoiceErrorMessage ||
+                          'Invoice tracking has not been published for this order yet.'}
+                      </Text>
+                      {selectedStoreOrder.invoice ? (
+                        <Text style={styles.checkoutSummaryNote}>
+                          Summary invoice status: {selectedStoreOrder.invoice.invoiceNumber} -{' '}
+                          {selectedStoreOrder.invoice.statusLabel}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.checkoutSummaryNote}>{selectedStoreOrder.crossServiceHint}</Text>
+                    </>
+                  )}
+                </View>
+
+                <View style={styles.checkoutFormCard}>
+                  <Text style={styles.checkoutCardTitle}>Billing Address Snapshot</Text>
+                  <Text style={styles.checkoutAddressText}>
+                    {buildCheckoutAddressLabel(
+                      selectedStoreOrder.addresses?.find((address) => address.addressType === 'billing'),
+                    ) || 'No billing address was returned in the order snapshot.'}
+                  </Text>
+                </View>
+
+                <View style={styles.checkoutFormCard}>
+                  <Text style={styles.checkoutCardTitle}>Ordered Items</Text>
+                  {selectedStoreOrder.items.map((item) => (
+                    <View key={item.id} style={styles.checkoutPreviewItem}>
+                      <View style={styles.checkoutPreviewItemCopy}>
+                        <Text style={styles.checkoutPreviewItemTitle}>{item.productName}</Text>
+                        <Text style={styles.checkoutPreviewItemMeta}>
+                          Qty {item.quantity}
+                          {item.productSku ? ` | SKU ${item.productSku}` : ''}
+                        </Text>
+                      </View>
+                      <Text style={styles.checkoutPreviewItemValue}>{item.lineTotalLabel}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.checkoutFormCard}>
+                  <Text style={styles.checkoutCardTitle}>Order Status Timeline</Text>
+                  {selectedStoreOrder.statusHistory.length ? (
+                    selectedStoreOrder.statusHistory.map((historyEntry, index) => (
+                      <StoreOrderHistoryEntry
+                        key={historyEntry.id}
+                        item={historyEntry}
+                        isLast={index === selectedStoreOrder.statusHistory.length - 1}
+                      />
+                    ))
+                  ) : (
+                    <Text style={styles.checkoutStateText}>
+                      No order status transitions have been recorded beyond the initial checkout yet.
+                    </Text>
+                  )}
+                </View>
+              </ScrollView>
+            </Animated.View>
+          ) : null}
+
           {isCartVisible ? (
             <Animated.View
               style={[
@@ -7059,14 +7130,18 @@ export default function Dashboard({
                   <Text style={styles.cartTitle}>
                     {checkoutState.stage === 'complete'
                       ? 'Checkout Complete'
-                      : checkoutState.stage === 'preview'
+                      : checkoutState.stage === 'billing'
+                        ? 'Billing Details'
+                        : checkoutState.stage === 'preview'
                         ? 'Invoice Checkout'
                         : 'Your Cart'}
                   </Text>
                   <Text style={styles.cartSubtitle}>
                     {checkoutState.stage === 'complete'
                       ? checkoutState.order?.orderNumber || 'Invoice order created'
-                      : checkoutState.stage === 'preview'
+                      : checkoutState.stage === 'billing'
+                        ? 'Add the billing snapshot that will be saved with the invoice order.'
+                        : checkoutState.stage === 'preview'
                         ? 'Review the immutable order snapshot before staff payment tracking begins.'
                         : `${cartCount} item${cartCount === 1 ? '' : 's'}`}
                   </Text>
@@ -7159,7 +7234,7 @@ export default function Dashboard({
                         }}
                         activeOpacity={0.88}
                       >
-                        <Text style={styles.secondaryButtonText}>View Order History</Text>
+                        <Text style={styles.secondaryButtonText}>View Order</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.cartCheckoutButton}
@@ -7193,7 +7268,10 @@ export default function Dashboard({
                     ) : null}
 
                     {checkoutState.errorMessage &&
-                    !(checkoutState.stage === 'preview' && checkoutState.previewStatus === 'error') ? (
+                    !(
+                      (checkoutState.stage === 'preview' || checkoutState.stage === 'billing') &&
+                      checkoutState.previewStatus === 'error'
+                    ) ? (
                       <View style={styles.checkoutInlineAlert}>
                         <MaterialCommunityIcons
                           name="alert-circle-outline"
@@ -7204,7 +7282,7 @@ export default function Dashboard({
                       </View>
                     ) : null}
 
-                    {checkoutState.stage === 'preview' ? (
+                    {checkoutState.stage === 'preview' || checkoutState.stage === 'billing' ? (
                       <>
                         {checkoutState.previewStatus === 'loading' ? (
                           <View style={styles.checkoutStateCard}>
@@ -7239,7 +7317,7 @@ export default function Dashboard({
                           </View>
                         ) : null}
 
-                        {checkoutState.previewStatus === 'ready' ? (
+                        {checkoutState.previewStatus === 'ready' && checkoutState.stage === 'preview' ? (
                           <>
                             <View style={styles.checkoutSummaryCard}>
                               <Text style={styles.checkoutSummaryTitle}>Invoice Preview</Text>
@@ -7283,6 +7361,60 @@ export default function Dashboard({
                                   </Text>
                                 </View>
                               ))}
+                            </View>
+
+                            <View style={styles.cartFooter}>
+                              <TouchableOpacity
+                                style={[styles.secondaryButton, styles.checkoutBackButton]}
+                                onPress={resetCheckoutFlow}
+                                activeOpacity={0.88}
+                              >
+                                <MaterialCommunityIcons
+                                  name="chevron-left"
+                                  size={18}
+                                  color={colors.text}
+                                />
+                                <Text style={styles.secondaryButtonText}>Back to Cart</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.cartCheckoutButton}
+                                onPress={handleContinueToBilling}
+                                activeOpacity={0.88}
+                              >
+                                <MaterialCommunityIcons
+                                  name="form-select"
+                                  size={18}
+                                  color={colors.onPrimary}
+                                />
+                                <Text style={styles.cartCheckoutText}>Continue to Billing</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </>
+                        ) : null}
+
+                        {checkoutState.previewStatus === 'ready' && checkoutState.stage === 'billing' ? (
+                          <>
+                            <View style={styles.checkoutSummaryCard}>
+                              <Text style={styles.checkoutSummaryTitle}>Order Snapshot</Text>
+                              <View style={styles.checkoutSummaryRow}>
+                                <Text style={styles.checkoutSummaryLabel}>Checkout Mode</Text>
+                                <Text style={styles.checkoutSummaryValue}>Invoice only</Text>
+                              </View>
+                              <View style={styles.checkoutSummaryRow}>
+                                <Text style={styles.checkoutSummaryLabel}>Items</Text>
+                                <Text style={styles.checkoutSummaryValue}>
+                                  {checkoutState.preview.totalQuantity}
+                                </Text>
+                              </View>
+                              <View style={styles.checkoutSummaryRow}>
+                                <Text style={styles.checkoutSummaryLabel}>Subtotal</Text>
+                                <Text style={styles.checkoutSummaryValue}>
+                                  {checkoutState.preview.subtotalLabel}
+                                </Text>
+                              </View>
+                              <Text style={styles.checkoutSummaryNote}>
+                                Your billing details below will be saved with this immutable invoice-backed order snapshot.
+                              </Text>
                             </View>
 
                             <View style={styles.checkoutFormCard}>
@@ -7366,7 +7498,14 @@ export default function Dashboard({
                             <View style={styles.cartFooter}>
                               <TouchableOpacity
                                 style={[styles.secondaryButton, styles.checkoutBackButton]}
-                                onPress={resetCheckoutFlow}
+                                onPress={() =>
+                                  setCheckoutState((currentState) => ({
+                                    ...currentState,
+                                    stage: 'preview',
+                                    errorMessage: '',
+                                    fieldErrors: {},
+                                  }))
+                                }
                                 activeOpacity={0.88}
                               >
                                 <MaterialCommunityIcons
@@ -7374,7 +7513,7 @@ export default function Dashboard({
                                   size={18}
                                   color={colors.text}
                                 />
-                                <Text style={styles.secondaryButtonText}>Back to Cart</Text>
+                                <Text style={styles.secondaryButtonText}>Back to Preview</Text>
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={[
@@ -7390,7 +7529,11 @@ export default function Dashboard({
                                 {checkoutState.submitting ? (
                                   <ActivityIndicator size="small" color={colors.onPrimary} />
                                 ) : (
-                                  <MaterialCommunityIcons name="receipt-text-check-outline" size={18} color={colors.onPrimary} />
+                                  <MaterialCommunityIcons
+                                    name="receipt-text-check-outline"
+                                    size={18}
+                                    color={colors.onPrimary}
+                                  />
                                 )}
                                 <Text style={styles.cartCheckoutText}>
                                   {checkoutState.submitting ? 'Creating Invoice Order' : 'Create Invoice Checkout'}
@@ -10778,6 +10921,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     marginTop: 4,
+  },
+  storeOrderSummaryCard: {
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: radius.large,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 14,
+  },
+  storeOrderSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  storeOrderSummaryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  storeOrderSummaryValue: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  storeOrderSummaryLabel: {
+    color: colors.mutedText,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  storeOrderSummaryBadge: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  storeOrderSummaryBadgeText: {
+    color: colors.labelText,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  storeOrderSummaryText: {
+    color: colors.mutedText,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 12,
   },
   storeOrderList: {
     marginBottom: 16,
