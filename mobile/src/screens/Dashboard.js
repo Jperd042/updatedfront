@@ -1179,7 +1179,7 @@ function ProfileSectionTab({ item, isActive, onPress }) {
     >
       <MaterialCommunityIcons
         name={item.icon}
-        size={16}
+        size={18}
         color={isActive ? colors.onPrimary : colors.mutedText}
       />
       <Text style={[styles.sectionTabText, isActive && styles.sectionTabTextActive]}>{item.label}</Text>
@@ -10725,36 +10725,42 @@ const styles = StyleSheet.create({
   },
   sectionTabsWrap: {
     flexDirection: 'row',
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: radius.medium,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 4,
+    padding: 5,
     marginBottom: 16,
+    gap: 4,
   },
-  sectionTabsWrapCompact: {
-    flexWrap: 'wrap',
-    gap: 6,
-  },
+  sectionTabsWrapCompact: {},
   sectionTabContainer: {
     flex: 1,
   },
   sectionTab: {
     flex: 1,
-    minHeight: 36,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   sectionTabActive: {
     backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
   },
   sectionTabText: {
     color: colors.mutedText,
     fontSize: 14,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
   sectionTabTextActive: {
     color: colors.onPrimary,
