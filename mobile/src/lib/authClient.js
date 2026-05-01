@@ -1,4 +1,11 @@
 import { Platform } from 'react-native';
+import {
+  customerMobileGuardMessages,
+  getCustomerMobileSessionAccessState,
+  isCustomerMobileRole,
+  isTechnicianMobileRole,
+  isTechnicianMobileSessionActive,
+} from './mobileSessionAccess';
 
 const defaultApiBaseUrl =
   Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://127.0.0.1:3000';
@@ -74,40 +81,13 @@ const deriveAccountState = (user) => (user?.isActive === false ? 'deactivated' :
 const deriveProfileState = ({ firstName, lastName, phoneNumber, birthday }) =>
   firstName && lastName && phoneNumber && birthday ? 'complete' : 'incomplete';
 
-export const customerMobileGuardMessages = {
-  unauthorized_session:
-    'Sign in with a customer account before opening that mobile workspace.',
-  staff_session_blocked:
-    'This mobile app is for customer accounts only. Staff roles should use the web portal.',
-  deactivated_customer_blocked:
-    'This customer account is deactivated. Contact support if access should be restored.',
+export {
+  customerMobileGuardMessages,
+  getCustomerMobileSessionAccessState,
+  isCustomerMobileRole,
+  isTechnicianMobileRole,
+  isTechnicianMobileSessionActive,
 };
-
-export const isCustomerMobileRole = (role) => !role || role === 'customer';
-
-export const isTechnicianMobileRole = (role) => role === 'technician';
-
-export const getCustomerMobileSessionAccessState = (account) => {
-  if (!account?.accessToken || !account?.userId) {
-    return 'unauthorized_session';
-  }
-
-  if (!isCustomerMobileRole(account.role)) {
-    return 'staff_session_blocked';
-  }
-
-  if (account.isActive === false) {
-    return 'deactivated_customer_blocked';
-  }
-
-  return 'customer_session_active';
-};
-
-export const isTechnicianMobileSessionActive = (account) =>
-  Boolean(account?.accessToken) &&
-  Boolean(account?.userId) &&
-  isTechnicianMobileRole(account?.role) &&
-  account?.isActive !== false;
 
 const buildAuthorizedHeaders = (accessToken) =>
   accessToken

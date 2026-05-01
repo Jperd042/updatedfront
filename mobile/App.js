@@ -27,7 +27,6 @@ import {
   customerMobileGuardMessages,
   createCustomerVehicle,
   getCustomerMobileSessionAccessState,
-  isTechnicianMobileSessionActive,
   loginAccount,
   registerAccount,
   startDeleteAccountOtp,
@@ -35,6 +34,10 @@ import {
   verifyDeleteAccountOtp,
   verifyRegistrationOtp,
 } from './src/lib/authClient';
+import {
+  assertMobileAppSessionAllowed,
+  getMobileAppSessionAccessState,
+} from './src/lib/mobileSessionAccess';
 import { cloneDate, formatVehicleDisplayName } from './src/utils/validation';
 import { colors } from './src/theme';
 import { ThemeProvider } from './src/theme/ThemeProvider';
@@ -160,8 +163,9 @@ function MenuScreen(props) {
     handleStartDeleteAccountOtp,
   } = useAppSessionContext();
   const currentAccount = activeAccount || registeredAccount;
+  const accessState = getMobileAppSessionAccessState(currentAccount);
 
-  if (isTechnicianMobileSessionActive(currentAccount)) {
+  if (accessState === 'technician_session_active') {
     return (
       <TechnicianDashboard
         {...props}
@@ -176,8 +180,6 @@ function MenuScreen(props) {
       />
     );
   }
-
-  const accessState = getCustomerMobileSessionAccessState(currentAccount);
 
   if (accessState !== 'customer_session_active') {
     return (
@@ -740,12 +742,17 @@ export default function App() {
       password,
       existingAccount: registeredAccount,
     });
-    const accessState = getCustomerMobileSessionAccessState(nextAccount);
 
-    if (accessState !== 'customer_session_active') {
+    try {
+      assertMobileAppSessionAllowed(nextAccount);
+    } catch (error) {
+      const accessState = getMobileAppSessionAccessState(nextAccount);
+
       throw new ApiError(
-        customerMobileGuardMessages[accessState] ??
-          customerMobileGuardMessages.staff_session_blocked,
+        error instanceof Error && error.message
+          ? error.message
+          : customerMobileGuardMessages[accessState] ??
+              customerMobileGuardMessages.staff_session_blocked,
         accessState === 'unauthorized_session' ? 401 : 403,
         {
           reason: accessState,
